@@ -1,0 +1,13 @@
+[
+  {"id": "ADMIN001", "name": "Admin", "phone": "", "vehicle": ""},
+  {"id": "CUST1001", "name": "Rahul Patel", "phone": "7984963834", "vehicle": "GJ01AB1234"},
+  {"id": "CUST1002", "name": "Priya Sharma", "phone": "9727502023", "vehicle": "GJ02AB1234"},
+  {"id": "CUST1003", "name": "Amit Desai", "phone": "7984963834", "vehicle": "GJ03AB1234"},
+  {"id": "CUST1004", "name": "Neha Gupta", "phone": "9727502023", "vehicle": "GJ04AB1234"},
+  {"id": "CUST1005", "name": "Vikram Singh", "phone": "7984963834", "vehicle": "GJ05AB1234"},
+  {"id": "CUST1006", "name": "Sneha Joshi", "phone": "9727502023", "vehicle": "GJ06AB1234"},
+  {"id": "CUST1007", "name": "Rohit Mehta", "phone": "7984963834", "vehicle": "GJ07AB1234"},
+  {"id": "CUST1008", "name": "Anita Verma", "phone": "9727502023", "vehicle": "GJ08AB1234"},
+  {"id": "CUST1009", "name": "Karan Shah", "phone": "7984963834", "vehicle": "GJ09AB1234"},
+  {"id": "CUST1010", "name": "Divya Rao", "phone": "9727502023", "vehicle": "GJ10AB1234"}
+]

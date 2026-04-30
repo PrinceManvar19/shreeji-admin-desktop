@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block title %}Login - Shreeji Auto Services{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <img src="{{ url_for('static', filename='images/logo1.png') }}"
+         class="auth-logo"
+         alt="Logo">
+
+    <h2 class="auth-title">
+      Welcome Back to <span>Shreeji</span>
+    </h2>
+
+    <p class="auth-subtitle">
+      Sign in with your phone number, customer ID, or admin ID to continue
+    </p>
+
+    <form method="POST" action="/login" class="auth-form" id="loginForm">
+      <label class="form-label" for="loginIdentifier">Phone Number, Customer ID, or Admin ID *</label>
+      <input type="text" class="form-control auth-input" id="loginIdentifier" name="identifier" placeholder="9876543210, CUST1001, or ADMIN001" required data-trim>
+      <div class="invalid-feedback" id="loginIdentifierError" style="display:none; color:#dc3545; font-size:0.875rem; margin-top:0.25rem;"></div>
+
+      <button type="submit" class="btn btn-primary w-100 auth-btn" data-loading-submit="true" data-loading-text="Logging in...">
+        Continue to Dashboard
+      </button>
+    </form>
+
+
+    <p style="text-align:center;margin-top:1rem;font-size:0.9em;color:#666;">New customer? <a href="/register" style="color:#007bff;font-weight:500;">Create your account →</a></p>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const loginForm = document.getElementById('loginForm');
+  const identifierInput = document.getElementById('loginIdentifier');
+  const identifierError = document.getElementById('loginIdentifierError');
+
+  loginForm.addEventListener('submit', function(event) {
+    identifierError.style.display = 'none';
+    identifierError.textContent = '';
+
+    const identifier = identifierInput.value.trim();
+
+    if (!identifier) {
+      event.preventDefault();
+      setLoading(event.submitter, false);
+      identifierError.textContent = 'Please enter your phone number, customer ID, or admin ID';
+      identifierError.style.display = 'block';
+      identifierInput.focus();
+      return;
+    }
+
+    if (/^\d+$/.test(identifier) && identifier.length !== 10) {
+      event.preventDefault();
+      setLoading(event.submitter, false);
+      identifierError.textContent = 'Phone number must be exactly 10 digits';
+      identifierError.style.display = 'block';
+      identifierInput.focus();
+      return;
+    }
+  });
+});
+</script>
+{% endblock %}

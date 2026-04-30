@@ -1,0 +1,50 @@
+[
+  {
+    "booking_id": "BOOK1001",
+    "customer_id": "CUST1001",
+    "name": "Rahul Patel",
+    "vehicle": "GJ27BL7672",
+    "service": "Full Service",
+    "date": "2026-04-03",
+    "status": "completed",
+    "created_at": "",
+    "checked_in": false,
+    "checked_in_at": null,
+    "completed_at": null,
+    "phone": "",
+    "brand_model": "",
+    "is_manual": false
+  },
+  {
+    "booking_id": "BOOK1018",
+    "customer_id": "CUST1008",
+    "name": "Anita Verma",
+    "phone": "",
+    "vehicle": "GJ08OP9012",
+    "brand_model": "Honda Activa 5G",
+    "service": "Engine Work",
+    "date": "2026-04-11",
+    "status": "approved",
+    "created_at": "2026-04-06 10:16",
+    "checked_in": false,
+    "checked_in_at": null,
+    "completed_at": null,
+    "is_manual": false
+  },
+  {
+    "booking_id": "BOOK1019",
+    "customer_id": "CUST1010",
+    "name": "Divya Rao",
+    "phone": "",
+    "vehicle": "GJ10ST7890",
+    "brand_model": "Honda Activa 5G",
+    "service": "Full Service",
+    "date": "2026-04-09",
+    "status": "approved",
+    "created_at": "2026-04-06 11:15",
+    "checked_in": false,
+    "checked_in_at": null,
+    "completed_at": null,
+    "is_manual": false
+  }
+]

@@ -1,0 +1,365 @@
+ {% extends "base.html" %}
+
+{% block title %}Book Service - Shreeji Auto Services{% endblock %}
+
+{% block content %}
+<section style="padding: 110px 5% 70px; background: linear-gradient(180deg, #f6f2ed 0%, #ffffff 100%); min-height: 100vh;">
+  <div style="max-width: 760px; margin: 0 auto;">
+    <div class="dash-card" style="padding:2rem;">
+      <div class="section-header" style="margin-bottom:1.5rem;">
+        <div>
+          <h1 class="dash-title">Book Service</h1>
+          <p class="dash-sub">Complete your booking directly with your logged-in customer details.</p>
+        </div>
+        <a href="/dashboard" class="dash-btn-secondary">
+          <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+      </div>
+
+      <form method="POST" action="/book" class="dash-form">
+        <input type="hidden" name="customer_id" value="{{ customer.id }}" />
+
+        <div class="dash-form-row">
+          <div class="dash-form-group">
+            <label>Name</label>
+            <input type="text" name="customer_name" value="{{ customer.name }}" readonly />
+          </div>
+          <div class="dash-form-group">
+            <label>Phone</label>
+            <input type="text" name="customer_phone" value="{{ customer.phone or session.get('phone', '') }}" readonly />
+          </div>
+        </div>
+
+        <div class="dash-form-group">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <label>Vehicle Number</label>
+            <button type="button" id="addVehicleBtnBook" class="dash-btn-secondary" style="padding:0.5rem 1rem; font-size:0.9rem;">
+              <i class="fas fa-plus-circle"></i> Add Vehicle
+            </button>
+          </div>
+          <div id="vehicleListContainerBook" style="border:1px solid #ddd; border-radius:8px; padding:0.75rem; background:#f8f9fa; min-height:50px; display:none;">
+            <div id="vehicleListBook" style="display:flex; flex-direction:column; gap:0.5rem;">
+              <p style="margin:0; color:#6c757d; font-size:0.9rem; text-align:center;">Loading vehicles...</p>
+            </div>
+          </div>
+          <input type="hidden" id="vehicle-number-hidden" name="vehicle_number" required />
+          <div class="invalid-feedback" id="vehicleErrorBook" style="display:none; color:#dc3545; font-size:0.875rem; margin-top:0.25rem;"></div>
+        </div>
+
+
+        <div class="dash-form-group mb-3">
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <label style="margin-bottom:0; white-space:nowrap;">Brand / Model</label>
+            <label class="form-check-label">
+              <input type="checkbox" id="manual-entry-toggle" class="form-check-input me-1">
+              Can't find your vehicle? Enter manually
+            </label>
+          </div>
+        </div>
+        <div id="brand-model-group" class="dash-form-group">
+          <input type="text" id="brand-model-input" name="brand_model" placeholder="e.g. Honda Activa 6G (autofilled or manual)" class="form-control" readonly />
+          <small class="form-text text-muted" id="manual-hint" style="display:none;">Type directly above or use "Add Vehicle" modal.</small>
+        </div>
+
+        <div class="dash-form-row">
+          <div class="dash-form-group">
+            <label>Service Type *</label>
+            <select name="service" id="serviceTypeBook" required>
+              <option value="">Select Service</option>
+              <option value="Full Service">Full Service</option>
+              <option value="Engine Work">Engine Work</option>
+              <option value="Washing">Washing</option>
+            </select>
+            <div class="invalid-feedback" id="serviceErrorBook" style="display:none; color:#dc3545; font-size:0.875rem; margin-top:0.25rem;"></div>
+          </div>
+          <div class="dash-form-group">
+            <label>Preferred Date *</label>
+            <select name="date" id="bookingDateBook" required>
+              <option value="">Select Date</option>
+              {% for slot in date_slots if slot.available > 0 %}
+                <option value="{{ slot.date }}">{{ slot.label }}</option>
+              {% endfor %}
+            </select>
+            <div class="invalid-feedback" id="dateErrorBook" style="display:none; color:#dc3545; font-size:0.875rem; margin-top:0.25rem;"></div>
+          </div>
+        </div>
+
+
+        <button type="submit" class="dash-btn-primary" data-loading-submit="true" data-loading-text="Sending Request...">
+          <i class="fas fa-paper-plane"></i> Send Booking Request
+        </button>
+      </form>
+
+      <!-- Add Vehicle Modal -->
+      <div id="addVehicleModalBook" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:99999; flex-items:center; justify-content:center;">
+        <div style="background:white; border-radius:16px; padding:2rem; max-width:450px; width:90%; margin:auto; margin-top: 2rem; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); box-shadow:0 25px 50px rgba(0,0,0,0.2);">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0; font-family:'Syne',sans-serif; font-size:1.5rem; font-weight:800; color:#a20405;">Add New Vehicle</h3>
+            <button type="button" id="closeAddVehicleModalBook" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#6c757d;">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          
+          <div style="margin-bottom:1rem;">
+            <label style="display:block; margin-bottom:0.5rem; font-weight:600;">Plate Number *</label>
+            <input type="text" id="bookNewPlate" placeholder="GJ01AB1234" style="width:100%; padding:0.75rem; border:1px solid #ddd; border-radius:8px; text-transform:uppercase; font-size:0.95rem;" />
+          </div>
+          
+          <div style="margin-bottom:1rem;">
+            <label style="display:block; margin-bottom:0.5rem; font-weight:600;">Brand *</label>
+            <input type="text" id="bookNewBrand" placeholder="Honda" style="width:100%; padding:0.75rem; border:1px solid #ddd; border-radius:8px; font-size:0.95rem;" />
+          </div>
+          
+          <div style="margin-bottom:1rem;">
+            <label style="display:block; margin-bottom:0.5rem; font-weight:600;">Model (Optional)</label>
+            <input type="text" id="bookNewModel" placeholder="Activa 6G" style="width:100%; padding:0.75rem; border:1px solid #ddd; border-radius:8px; font-size:0.95rem;" />
+          </div>
+
+          <div id="addVehicleMessageBook" style="margin-bottom:1rem; padding:0.75rem; border-radius:8px; display:none;"></div>
+
+          <div style="display:flex; gap:0.75rem;">
+            <button type="button" id="bookSaveVehicle" class="dash-btn-primary" style="flex:1; padding:0.75rem;">
+              <i class="fas fa-save"></i> Save Vehicle
+            </button>
+            <button type="button" id="bookCancelVehicle" class="dash-btn-secondary" style="flex:1; padding:0.75rem;">
+              <i class="fas fa-times"></i> Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const customerPhone = "{{ customer.phone or '' }}";
+        const vehicleListContainer = document.getElementById('vehicleListContainerBook');
+        const toggleManual = document.getElementById('manual-entry-toggle');
+        const brandModelInput = document.getElementById('brand-model-input');
+        const manualHint = document.getElementById('manual-hint');
+        const vehicleList = document.getElementById('vehicleListBook');
+        const vehicleHidden = document.getElementById('vehicle-number-hidden');
+        const addVehicleBtnBook = document.getElementById('addVehicleBtnBook');
+        const addVehicleModalBook = document.getElementById('addVehicleModalBook');
+        const closeAddVehicleModalBook = document.getElementById('closeAddVehicleModalBook');
+        const bookSaveVehicle = document.getElementById('bookSaveVehicle');
+        const bookCancelVehicle = document.getElementById('bookCancelVehicle');
+        const bookNewPlate = document.getElementById('bookNewPlate');
+        const bookNewBrand = document.getElementById('bookNewBrand');
+        const bookNewModel = document.getElementById('bookNewModel');
+        const addVehicleMessageBook = document.getElementById('addVehicleMessageBook');
+
+        if (!customerPhone) {
+          vehicleList.innerHTML = '<p style="margin:0; color:#dc3545; font-size:0.9rem; text-align:center;">Phone number not available</p>';
+          vehicleListContainer.style.display = 'block';
+          return;
+        }
+
+        // Load vehicles
+        function loadVehicles() {
+          fetch('/api/vehicles/' + encodeURIComponent(customerPhone))
+            .then(r => r.json())
+            .then(data => {
+              const vehicles = data.vehicles || [];
+              vehicleList.innerHTML = '';
+
+              if (vehicles.length === 0) {
+                vehicleList.innerHTML = '<div style="text-align:center; padding:1rem;"><i class="fas fa-motorcycle" style="font-size:2rem; color:#9ca3af; margin-bottom:0.5rem; display:block;"></i><p style="margin:0; color:#6c757d; font-size:0.9rem;">No vehicles found.</p><button type="button" class="btn btn-sm btn-outline-danger mt-2" onclick="document.getElementById(\'addVehicleBtnBook\').click()"><i class="fas fa-plus"></i> Add New Vehicle</button></div>';
+                vehicleListContainer.style.display = 'block';
+                return;
+              }
+
+
+              vehicleListContainer.style.display = 'block';
+              vehicles.forEach(v => {
+                const vehicleItem = document.createElement('div');
+                vehicleItem.style.cssText = 'padding-inline:0.75rem; padding-block:0.25rem; background:white; border:1px solid #dee2e6; border-radius:6px; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; gap:0.75rem;';
+                const displayText = v.brand ? `${v.plate_number} (${v.brand}${v.model ? ' ' + v.model : ''})` : v.plate_number;
+                vehicleItem.innerHTML = `
+                  <input type="radio" name="vehicleOptionBook" value="${v.plate_number}" data-brand="${v.brand || ''}" data-model="${v.model || ''}" style="cursor:pointer;">
+                  <div style="flex:1;">
+                    <div style="font-weight:700; color:#1f2937;">${displayText}</div>
+                  </div>
+                `;
+
+                
+                vehicleItem.addEventListener('mouseover', () => {
+                  vehicleItem.style.background = '#f0f0f0';
+                });
+                vehicleItem.addEventListener('mouseout', () => {
+                  vehicleItem.style.background = 'white';
+                });
+                
+                const radio = vehicleItem.querySelector('input[type="radio"]');
+                radio.addEventListener('change', function() {
+                  vehicleHidden.value = this.value;
+                  const brand = this.dataset.brand || '';
+                  const model = this.dataset.model || '';
+                  if (!toggleManual.checked) {
+                    brandModelInput.value = (brand + ' ' + model).trim();
+                  }
+                });
+                
+                vehicleList.appendChild(vehicleItem);
+              });
+            })
+            .catch(() => {
+              vehicleList.innerHTML = '<p style="margin:0; color:#dc3545; font-size:0.9rem; text-align:center;">Error loading vehicles</p>';
+              vehicleListContainer.style.display = 'block';
+            });
+        }
+
+        // Modal controls
+        addVehicleBtnBook.addEventListener('click', function() {
+          addVehicleModalBook.style.display = 'flex';
+          bookNewPlate.focus();
+          bookNewPlate.value = '';
+          bookNewBrand.value = '';
+          bookNewModel.value = '';
+          addVehicleMessageBook.style.display = 'none';
+        });
+
+        closeAddVehicleModalBook.addEventListener('click', function() {
+          addVehicleModalBook.style.display = 'none';
+        });
+
+        bookCancelVehicle.addEventListener('click', function() {
+          addVehicleModalBook.style.display = 'none';
+        });
+
+        addVehicleModalBook.addEventListener('click', function(e) {
+          if (e.target === addVehicleModalBook) {
+            addVehicleModalBook.style.display = 'none';
+          }
+        });
+
+        // Manual entry toggle
+        toggleManual.addEventListener('change', function() {
+          if (this.checked) {
+            brandModelInput.removeAttribute('readonly');
+            brandModelInput.style.backgroundColor = '';
+            manualHint.style.display = 'block';
+            brandModelInput.focus();
+          } else {
+            brandModelInput.setAttribute('readonly', true);
+            brandModelInput.style.backgroundColor = '#f8f9fa';
+            manualHint.style.display = 'none';
+          }
+        });
+
+        // Save new vehicle
+        bookSaveVehicle.addEventListener('click', async function() {
+          const plate = bookNewPlate.value.trim().toUpperCase();
+          const brand = bookNewBrand.value.trim();
+          const model = bookNewModel.value.trim();
+
+          if (!plate || !brand) {
+            showMessage('Plate number and brand are required', 'error');
+            return;
+          }
+
+          if (!/^[A-Z0-9\s-]{4,15}$/.test(plate)) {
+            showMessage('Invalid plate number format', 'error');
+            return;
+          }
+
+          setLoading(bookSaveVehicle, true);
+
+          try {
+            const response = await fetch('/api/vehicles/add', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ plate_number: plate, brand, model })
+            });
+            const result = await response.json();
+
+            if (result.success) {
+              showToast('Vehicle added successfully!', 'success');
+              addVehicleModalBook.style.display = 'none';
+              // Populate brand/model even in manual mode
+              if (toggleManual.checked) {
+                brandModelInput.value = (brand + (model ? ' ' + model : '')).trim();
+              }
+              // Auto-select the new vehicle after list reloads
+              setTimeout(() => {
+                loadVehicles();
+                setTimeout(() => {
+                  const radios = vehicleList.querySelectorAll('input[type="radio"]');
+                  radios.forEach(radio => {
+                    if (radio.value === plate) {
+                      radio.checked = true;
+                      radio.dispatchEvent(new Event('change'));
+                    }
+                  });
+                }, 300);
+              }, 300);
+            } else {
+              showMessage(result.message || result.error || 'Failed to add vehicle', 'error');
+            }
+          } catch (error) {
+            console.error('Error:', error);
+            showMessage('Network error. Please try again.', 'error');
+          } finally {
+            setLoading(bookSaveVehicle, false);
+          }
+        });
+
+
+        function showMessage(message, type) {
+          addVehicleMessageBook.textContent = message;
+          addVehicleMessageBook.style.display = 'block';
+          addVehicleMessageBook.style.background = type === 'error' ? '#fee' : '#efe';
+          addVehicleMessageBook.style.color = type === 'error' ? '#c33' : '#3c3';
+          addVehicleMessageBook.style.border = `1px solid ${type === 'error' ? '#fcc' : '#cfc'}`;
+        }
+
+        const form = document.querySelector('form.dash-form');
+        // Form validation
+        form.addEventListener('submit', function(event) {
+
+          const vehicleError = document.getElementById('vehicleErrorBook');
+          const serviceError = document.getElementById('serviceErrorBook');
+          const dateError = document.getElementById('dateErrorBook');
+          if (vehicleError) { vehicleError.style.display = 'none'; vehicleError.textContent = ''; }
+          if (serviceError) { serviceError.style.display = 'none'; serviceError.textContent = ''; }
+          if (dateError) { dateError.style.display = 'none'; dateError.textContent = ''; }
+
+          const vehicle = vehicleHidden.value;
+          const service = document.getElementById('serviceTypeBook').value;
+          const date = document.getElementById('bookingDateBook').value;
+
+          let hasError = false;
+          if (!vehicle) {
+            if (vehicleError) {
+              vehicleError.textContent = 'Please select a vehicle';
+              vehicleError.style.display = 'block';
+            }
+            hasError = true;
+          }
+          if (!service) {
+            if (serviceError) {
+              serviceError.textContent = 'Please select a service type';
+              serviceError.style.display = 'block';
+            }
+            hasError = true;
+          }
+          if (!date) {
+            if (dateError) {
+              dateError.textContent = 'Please select a preferred date';
+              dateError.style.display = 'block';
+            }
+            hasError = true;
+          }
+          if (hasError) {
+            event.preventDefault();
+            setLoading(event.submitter, false);
+            return;
+          }
+        });
+
+        loadVehicles();
+      });
+
+      </script>
+    </div>
+  </div>
+</section>
+{% endblock %}

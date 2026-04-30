@@ -1,0 +1,307 @@
+﻿﻿﻿﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Shreeji Auto Services - Premium two-wheeler service center. Expert mechanics, genuine parts, reliable care." />
+  <title>{% block title %}Shreeji Auto Services{% endblock %}</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+  <nav class="navbar" id="navbar">
+
+    <a href="{{ url_for('main.home') }}" class="navbar-brand">
+      <img src="{{ url_for('static', filename='images/logo1.png') }}"
+           alt="Shreeji Auto Services"
+           class="navbar-logo" />
+      <span class="brand-divider"></span>
+      <span class="brand-text">
+        <span class="brand-main">Shreeji</span>
+        <span class="brand-sub">Auto Services</span>
+      </span>
+    </a>
+
+    <ul class="navbar-links">
+      <li><a href="{{ url_for('main.home') }}">Home</a></li>
+      <li><a href="#services">Services</a></li>
+      <li><a href="#achievements">About</a></li>
+      {% if 'user' in session %}
+        {% if session.user.role == 'admin' %}
+
+
+          <li><a href="/admin">Admin</a></li>
+
+        {% else %}
+          <li><a href="/dashboard">Dashboard</a></li>
+        {% endif %}
+        <li><a href="/logout">Logout</a></li>
+      {% else %}
+        <li><a href="/login" class="nav-cta">
+          <i class="fas fa-calendar-check"></i> Login / Book
+        </a></li>
+      {% endif %}
+    </ul>
+
+  </nav>
+
+  <main>
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+      <div class="footer-top">
+
+        <div class="footer-brand-col">
+          <div class="footer-logo-large-wrap">
+            <img src="{{ url_for('static', filename='images/logo1.png') }}"
+                 alt="Shreeji Auto Services"
+                 class="footer-logo-large" />
+          </div>
+          <div class="footer-brand">
+            <div class="footer-brand-name">Shreeji Auto Services</div>
+            <div class="footer-brand-tagline">Ride with confidence</div>
+          </div>
+          <p class="footer-brand-desc">
+            Expert two-wheeler care, genuine parts, and reliable service -
+            keeping your ride in peak condition since 2009.
+          </p>
+          <a href="https://share.google/E2KBu8QOEqSHnokiM" target="_blank" rel="noreferrer" class="rating-link-footer footer-rating">
+            <span class="footer-rating-stars">
+              <i class="fas fa-star"></i><i class="fas fa-star"></i>
+              <i class="fas fa-star"></i><i class="fas fa-star"></i>
+              <i class="far fa-star"></i>
+            </span>
+            <span>4.4 / 5</span>
+            <small>86+ reviews on Google</small>
+          </a>
+        </div>
+
+        <div>
+          <p class="footer-col-title">Services</p>
+          <ul class="footer-links">
+            <li><a href="#"><i class="fas fa-chevron-right"></i> General Service</a></li>
+            <li><a href="#"><i class="fas fa-chevron-right"></i> Engine Repair</a></li>
+            <li><a href="#"><i class="fas fa-chevron-right"></i> Tyre & Alignment</a></li>
+            <li><a href="#"><i class="fas fa-chevron-right"></i> Brake Service</a></li>
+            <li><a href="#"><i class="fas fa-chevron-right"></i> Battery Service</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <p class="footer-col-title">Company</p>
+          <ul class="footer-links">
+            <li><a href="#"><i class="fas fa-chevron-right"></i> About Us</a></li>
+            <li><a href="#"><i class="fas fa-chevron-right"></i> Careers</a></li>
+            <li><a href="#"><i class="fas fa-chevron-right"></i> Blog</a></li>
+            <li><a href="#"><i class="fas fa-chevron-right"></i> Contact</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <p class="footer-col-title">Contact Us</p>
+          <ul class="footer-contact">
+            <li><i class="fas fa-map-marker-alt"></i> Ahmedabad, Gujarat</li>
+            <li><i class="fas fa-phone"></i> +91 98983 34402</li>
+            <li><i class="fas fa-envelope"></i> info@shreeji.in</li>
+            <li><i class="fas fa-clock"></i> Mon-Sat, 9am - 7pm</li>
+          </ul>
+        </div>
+
+      </div>
+
+      <div class="footer-bottom">
+        <span>&copy; 2026 Shreeji Auto Services. All rights reserved.</span>
+        <span class="footer-bottom-right">
+          <a href="#">Privacy Policy</a>
+          <span class="footer-dot">·</span>
+          <a href="#">Terms</a>
+          <span class="footer-dot">·</span>
+          Built with <span class="footer-heart">♥</span> for every rider
+        </span>
+      </div>
+
+    </div>
+  </footer>
+
+  <script>
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      navbar.classList.toggle('scrolled', window.scrollY > 50);
+    });
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    function showToast(message, type) {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      const colors = {
+        success: { bg: '#10b981', icon: 'check-circle' },
+        error: { bg: '#ef4444', icon: 'exclamation-circle' },
+        warning: { bg: '#f59e0b', icon: 'exclamation-triangle' },
+        info: { bg: '#3b82f6', icon: 'info-circle' }
+      };
+      const style = colors[type] || colors.info;
+
+      toast.className = 'toast-notification';
+      toast.style.cssText = 'background:' + style.bg + ';color:#fff;padding:0.875rem 1.5rem;border-radius:0.5rem;margin-bottom:0.5rem;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,0.15);transform:translateX(120%);transition:transform 0.3s ease;display:flex;align-items:center;gap:0.5rem;min-width:280px;';
+      toast.innerHTML = '<i class="fas fa-' + style.icon + '"></i> ' + message;
+
+      const closeBtn = document.createElement('button');
+      closeBtn.innerHTML = '&times;';
+      closeBtn.style.cssText = 'background:none;border:none;color:#fff;font-size:1.25rem;margin-left:auto;cursor:pointer;padding:0 0.25rem;';
+      closeBtn.onclick = function() { toast.remove(); };
+      toast.appendChild(closeBtn);
+
+      container.appendChild(toast);
+
+      requestAnimationFrame(() => {
+        toast.style.transform = 'translateX(0)';
+      });
+
+      setTimeout(() => {
+        toast.style.transform = 'translateX(120%)';
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    function setLoading(button, isLoading = true) {
+      if (!button) return;
+
+      if (isLoading) {
+        if (!button.dataset.originalHtml) {
+          button.dataset.originalHtml = button.innerHTML;
+        }
+        button.disabled = true;
+        button.classList.add('is-loading');
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (button.dataset.loadingText || 'Processing...');
+      } else {
+        button.disabled = false;
+        button.classList.remove('is-loading');
+        if (button.dataset.originalHtml) {
+          button.innerHTML = button.dataset.originalHtml;
+        }
+      }
+    }
+
+    function normalizePhone(input) {
+      let value = input.value.replace(/\D/g, '');
+      if (value.length > 10 && value.startsWith('91')) {
+        value = value.slice(-10);
+      }
+      input.value = value;
+    }
+
+    function normalizePlate(input) {
+      input.value = input.value.toUpperCase().replace(/[^A-Z0-9\s-]/g, '');
+    }
+
+    function trimInput(input) {
+      input.value = input.value.trim();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('input[data-normalize="phone"]').forEach(input => {
+        input.addEventListener('blur', () => normalizePhone(input));
+        input.addEventListener('input', () => {
+          input.value = input.value.replace(/\D/g, '').slice(0, 12);
+        });
+      });
+
+      document.querySelectorAll('input[data-normalize="plate"]').forEach(input => {
+        input.addEventListener('blur', () => normalizePlate(input));
+        input.addEventListener('input', () => {
+          input.value = input.value.toUpperCase().replace(/[^A-Z0-9\s-]/g, '');
+        });
+      });
+
+      document.querySelectorAll('input[data-trim]').forEach(input => {
+        input.addEventListener('blur', () => trimInput(input));
+      });
+
+      document.querySelectorAll('form').forEach((form) => {
+        form.addEventListener('submit', (event) => {
+          const submitter = event.submitter;
+          if (!submitter || !submitter.dataset.loadingSubmit) return;
+
+          if (submitter.disabled) {
+            event.preventDefault();
+            return;
+          }
+
+          setLoading(submitter, true);
+        });
+      });
+
+      document.addEventListener('click', (event) => {
+        const actionElement = event.target.closest('a[data-loading-text], a[data-toast-message]');
+        if (!actionElement || actionElement.tagName !== 'A') return;
+
+        if (actionElement.disabled) {
+          event.preventDefault();
+          return;
+        }
+
+        setLoading(actionElement, true);
+
+        if (actionElement.target === '_blank') {
+          event.preventDefault();
+          window.open(actionElement.href, '_blank', 'noopener');
+          setTimeout(() => setLoading(actionElement, false), 1000);
+        }
+      });
+
+      const flashMessages = document.querySelectorAll('[data-flash-message]');
+      flashMessages.forEach(el => {
+        const message = el.dataset.flashMessage;
+        const category = el.dataset.flashCategory || 'info';
+        showToast(message, category);
+        el.remove();
+      });
+    });
+  </script>
+
+  {% block extra_scripts %}{% endblock %}
+
+  <style>
+    #toast-container {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+  </style>
+
+  <div id="toast-container"></div>
+
+  <div style="display:none;">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          {% set toast_type = 'success' if category == 'success' else 'error' if category == 'error' else 'warning' if category == 'warning' else 'info' %}
+          <span data-flash-message="{{ message }}" data-flash-category="{{ toast_type }}"></span>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+  </div>
+
+</body>
+</html>

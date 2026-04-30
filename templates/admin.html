@@ -1,0 +1,799 @@
+{# Old all-in-one admin dashboard archived as an inert template comment during sidebar split. #}
+{% extends "admin_base.html" %}
+{% block title %}Admin Dashboard - Shreeji Auto Services{% endblock %}
+
+{% block content %}
+<div class="dashboard-wrap">
+  <div class="dash-header">
+    <div>
+      <h1 class="dash-title">
+        <i class="fas fa-tachometer-alt"></i> Admin Dashboard
+      </h1>
+      <p class="dash-sub">Shreeji Auto Services - Garage Management</p>
+    </div>
+  </div>
+
+  <div class="admin-stats today-control-panel">
+    <div class="admin-stat-card today-card today-pending">
+      <i class="fas fa-clock"></i>
+      <div class="admin-stat-num" id="today-pending-count">{{ today_stats.pending or 0 }}</div>
+      <div class="admin-stat-label">Pending</div>
+    </div>
+    <div class="admin-stat-card today-card today-approved">
+      <i class="fas fa-check-circle"></i>
+      <div class="admin-stat-num" id="today-approved-count">{{ today_stats.approved or 0 }}</div>
+      <div class="admin-stat-label">Approved</div>
+    </div>
+    <div class="admin-stat-card today-card today-checked-in">
+      <i class="fas fa-motorcycle"></i>
+      <div class="admin-stat-num" id="today-checked-in-count">{{ today_stats.checked_in or 0 }}</div>
+      <div class="admin-stat-label">Checked-In</div>
+    </div>
+    <div class="admin-stat-card today-card today-completed">
+      <i class="fas fa-flag-checkered"></i>
+      <div class="admin-stat-num" id="today-completed-count">{{ today_stats.completed or 0 }}</div>
+      <div class="admin-stat-label">Completed</div>
+    </div>
+  </div>
+
+  <div class="dash-card">
+    <div class="section-header">
+      <h2 class="dash-card-title" style="margin-bottom:0;">
+        <i class="fas fa-calendar-day"></i> Today's Bookings
+        <span class="dash-sub" style="font-size:0.85rem; margin-left:0.5rem;">
+          ({{ today_display or today }})
+        </span>
+      </h2>
+    </div>
+
+    <div class="table-responsive dash-table-wrap">
+      <table class="dash-table" id="today-bookings-table">
+        <thead>
+          <tr>
+            <th>Booking ID</th>
+            <th>Customer Name</th>
+            <th>Phone</th>
+            <th>Vehicle</th>
+            <th>Service</th>
+            <th>Booking Date</th>
+            <th>Actual Visit Date</th>
+            <th>Time</th>
+            <th>Status</th>
+            <th class="action-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if today_bookings %}
+            {% for b in today_bookings %}
+            <tr class="today-booking-row" data-booking-id="{{ b.booking_id }}" data-status="{{ b.status }}">
+              <td><strong>{{ b.booking_id }}</strong></td>
+              <td>
+                <div>{{ b.name }}</div>
+                {% if b.customer_id %}<small class="text-muted">{{ b.customer_id }}</small>{% endif %}
+              </td>
+              <td>{{ b.phone or '-' }}</td>
+              <td>
+                <div>{{ b.vehicle }}</div>
+                {% if b.brand_model %}<small class="text-muted">{{ b.brand_model }}</small>{% endif %}
+              </td>
+              <td>{{ b.service }}</td>
+              <td>{{ b.formatted_date or b.date }}</td>
+              <td>
+                {% if b.is_rescheduled %}
+                  {{ b.formatted_actual_visit_date or b.actual_visit_date or '-' }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>{{ b.formatted_created_at or b.created_at or '-' }}</td>
+              <td>
+                <span class="status-badge status-{{ b.status }}" id="status-{{ b.booking_id }}">
+                  {% if b.status == 'pending' %}Pending
+                  {% elif b.status == 'approved' %}Approved
+                  {% elif b.status == 'checked_in' %}Checked-In
+                  {% elif b.status == 'completed' %}Completed
+                  {% elif b.status == 'rejected' %}Rejected
+                  {% else %}{{ b.status }}{% endif %}
+                </span>
+              </td>
+              <td class="action-col">
+                <div class="action-buttons" id="actions-{{ b.booking_id }}">
+                  {% if b.status == 'pending' %}
+                    <button type="button" class="btn btn-primary btn-sm action-btn-compact ajax-action-btn" 
+                            data-action="approve" data-booking-id="{{ b.booking_id }}">
+                      <i class="fas fa-check"></i> Approve
+                    </button>
+                  {% elif b.status == 'approved' %}
+                    <button type="button" class="btn btn-purple btn-sm action-btn-compact ajax-action-btn" 
+                            data-action="checkin" data-booking-id="{{ b.booking_id }}">
+                      <i class="fas fa-motorcycle"></i> Check-In
+                    </button>
+                  {% elif b.status == 'checked_in' %}
+                    <button type="button" class="btn btn-success btn-sm action-btn-compact ajax-action-btn" 
+                            data-action="complete" data-booking-id="{{ b.booking_id }}">
+                      <i class="fas fa-flag-checkered"></i> Complete
+                    </button>
+                  {% else %}
+                    <span class="dash-sub">-</span>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr id="today-empty-state">
+              <td colspan="10" class="dash-empty">
+                <div class="empty-state">
+                  <i class="fas fa-calendar-day empty-icon"></i>
+                  <p>No bookings for today</p>
+                </div>
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="dash-card">
+    <div class="section-header">
+      <h2 class="dash-card-title" style="margin-bottom:0;">
+        <i class="fas fa-rotate"></i> Late Arrivals
+      </h2>
+    </div>
+
+    <div class="table-responsive dash-table-wrap">
+      <table class="dash-table">
+        <thead>
+          <tr>
+            <th>Booking ID</th>
+            <th>Customer Name</th>
+            <th>Phone</th>
+            <th>Vehicle</th>
+            <th>Service</th>
+            <th>Original Date</th>
+            <th>Actual Visit Date</th>
+            <th class="action-col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if late_arrival_bookings %}
+            {% for b in late_arrival_bookings %}
+            <tr class="late-arrival-row" data-booking-id="{{ b.booking_id }}" data-status="{{ b.status }}">
+              <td><strong>{{ b.booking_id }}</strong></td>
+              <td>
+                <div>{{ b.name }}</div>
+                {% if b.customer_id %}<small class="text-muted">{{ b.customer_id }}</small>{% endif %}
+              </td>
+              <td>{{ b.phone or '-' }}</td>
+              <td>
+                <div>{{ b.vehicle }}</div>
+                {% if b.brand_model %}<small class="text-muted">{{ b.brand_model }}</small>{% endif %}
+              </td>
+              <td>{{ b.service }}</td>
+              <td>{{ b.formatted_date or b.date }}</td>
+              <td>{{ today_display or today }}</td>
+              <td class="action-col">
+                {% if b.status == 'approved' and b.date != today %}
+                  <button type="button"
+                          class="btn btn-purple btn-sm action-btn-compact ajax-action-btn"
+                          data-action="reschedule-checkin"
+                          data-booking-id="{{ b.booking_id }}">
+                    🔄 Late Arrival
+                  </button>
+                {% else %}
+                  <span class="dash-sub">-</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="8" class="dash-empty">No late arrivals waiting for check-in.</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="dash-card">
+    <div class="section-header">
+      <h2 class="dash-card-title" style="margin-bottom:0;">
+        <i class="fas fa-warehouse"></i> Vehicles in Garage
+      </h2>
+    </div>
+    <p class="dash-sub" style="margin-top:-0.25rem; margin-bottom:1rem;">
+      Vehicles in Garage: {{ vehicles_in_garage|length }}
+    </p>
+
+    <div class="table-responsive dash-table-wrap">
+      <table class="dash-table">
+        <thead>
+          <tr>
+            <th>Booking ID</th>
+            <th>Customer Name</th>
+            <th>Phone</th>
+            <th>Vehicle Number</th>
+            <th>Brand/Model</th>
+            <th>Service</th>
+            <th>Booking Date</th>
+            <th>Actual Visit Date</th>
+            <th>Check-In Time</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if vehicles_in_garage %}
+            {% for b in vehicles_in_garage %}
+            {% set booking = b %}
+            <tr>
+              <td><strong>{{ b.booking_id }}</strong></td>
+              <td>{{ b.name }}</td>
+              <td>{{ b.phone or '-' }}</td>
+              <td>{{ b.vehicle }}</td>
+              <td>{{ b.brand_model or '-' }}</td>
+              <td>{{ b.service }}</td>
+              <td>{{ b.formatted_date or b.date }}</td>
+              <td>
+                {% if b.is_rescheduled %}
+                  {{ b.formatted_actual_visit_date or b.actual_visit_date or '-' }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>{{ b.formatted_checked_in_at or b.checked_in_at or '-' }}</td>
+              <td>
+                {% if booking.phone %}
+                  {% set message =
+                  "Hello " ~ booking.name ~ "\n\n" ~
+                  "Booking ID: " ~ booking.booking_id ~ "\n" ~
+                  "Service Type: " ~ booking.service ~ "\n" ~
+                  "Vehicle Number: " ~ booking.vehicle ~ "\n" ~
+                  "Date: " ~ booking.date ~ "\n" ~
+                  "Status: Completed\n\n" ~
+                  "Your vehicle service is completed. You may collect your vehicle.\n\n" ~
+                  "Thank you - Shreeji Auto Services"
+                  %}
+                  <a target="_blank"
+                     class="btn btn-success btn-sm"
+                     data-whatsapp-button="true"
+                     data-booking-id="{{ booking.booking_id }}"
+                     data-action="completed"
+                     style="display:none;"
+                     href="https://wa.me/{{ '91' ~ booking.phone }}?text={{ message|urlencode }}">
+                    Send WhatsApp
+                  </a>
+                {% endif %}
+                <a href="/admin/complete/{{ b.booking_id }}"
+                   class="btn btn-primary btn-sm loading-btn"
+                   data-whatsapp-trigger="true"
+                   data-booking-id="{{ b.booking_id }}"
+                   data-action="completed"
+                   data-loading-text="Completing...">Mark Complete</a>
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="10" class="dash-empty">No active vehicles in the garage.</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="dash-card">
+    <h2 class="dash-card-title">
+      <i class="fas fa-id-card"></i> Check-In Section
+    </h2>
+
+    <form method="POST" action="/admin/checkin/verify" class="dash-form">
+      <div class="dash-form-row" style="align-items:flex-end;">
+        <div class="dash-form-group">
+          <label>Booking ID</label>
+          <input type="text"
+                 name="booking_id"
+                 value="{{ checkin_booking_id or '' }}"
+                 placeholder="e.g. BOOK1001"
+                 required
+                 style="text-transform:uppercase;letter-spacing:0.04em;" />
+        </div>
+        <div class="dash-form-group" style="flex:0;">
+          <button type="submit" class="dash-btn-primary loading-btn" data-loading-text="Fetching..." style="margin-top:0;">
+            <i class="fas fa-search"></i> Fetch Booking
+          </button>
+        </div>
+      </div>
+    </form>
+
+    {% if booking_data %}
+      {% set booking = booking_data %}
+      <div class="checkin-booking-card">
+        <h3 class="dash-card-title"><i class="fas fa-clipboard-check"></i> Booking Details</h3>
+        <div class="checkin-booking-grid">
+          <div><strong>Name:</strong> {{ booking.name }}</div>
+          <div><strong>Phone:</strong> {{ booking.phone or '-' }}</div>
+          <div><strong>Vehicle:</strong> {{ booking.vehicle }}</div>
+          <div><strong>Service:</strong> {{ booking.service }}</div>
+          <div><strong>Date:</strong> {{ booking.formatted_date or booking.date }}</div>
+          <div><strong>Status:</strong> {{ booking.status_display or booking.status }}</div>
+        </div>
+
+        {% if booking.date == today and booking.status == 'approved' %}
+          <div style="margin-top:1rem;">
+            <a href="/admin/checkin/{{ booking.booking_id }}"
+               class="dash-btn-primary"
+               data-whatsapp-trigger="true"
+               data-booking-id="{{ booking.booking_id }}"
+               data-action="checked_in"
+               data-loading-text="Checking In...">
+              <i class="fas fa-check-circle"></i> Check-In
+            </a>
+          </div>
+          {% if booking.phone %}
+            {% set message =
+            "Hello " ~ booking.name ~ "%0A%0A" ~
+            "Your vehicle has been received at our garage.%0A" ~
+            "Service is in progress.%0A%0A" ~
+            "We will notify you once ready.%0A%0A" ~
+            "- Shreeji Auto Services"
+            %}
+            <a target="_blank"
+               class="btn btn-success btn-sm"
+               data-whatsapp-button="true"
+               data-booking-id="{{ booking.booking_id }}"
+               data-action="checked_in"
+               data-loading-text="Sending..."
+               data-toast-message="WhatsApp opened"
+               style="display:none;margin-top:1rem;"
+               href="https://wa.me/{{ '91' ~ booking.phone }}?text={{ message }}">
+              WhatsApp
+            </a>
+          {% endif %}
+        {% elif booking.date != today and booking.status == 'approved' %}
+          <div style="margin-top:1rem;">
+            <form method="POST" action="/admin/booking/{{ booking.booking_id }}/reschedule-checkin" style="display:inline;">
+              <button type="submit"
+                      class="dash-btn-primary loading-btn"
+                      data-loading-text="Checking In...">
+                <i class="fas fa-rotate"></i> 🔄 Late Arrival
+              </button>
+            </form>
+          </div>
+          <div class="dash-sub" style="margin-top:0.75rem;">
+            Original booking date: {{ booking.formatted_date or booking.date }} |
+            Actual visit date: {{ today_display or today }}
+          </div>
+        {% elif booking.date != today %}
+          <div class="dash-sub" style="margin-top:1rem;">Not scheduled for today</div>
+        {% elif booking.status == 'checked_in' %}
+          <div class="dash-sub" style="margin-top:1rem;">This vehicle is already checked in.</div>
+        {% elif booking.status == 'completed' %}
+          <div class="dash-sub" style="margin-top:1rem;">This booking has already been completed.</div>
+        {% elif booking.status == 'rejected' %}
+          <div class="dash-sub" style="margin-top:1rem;">This booking was rejected and cannot be checked in.</div>
+        {% else %}
+          <div class="dash-sub" style="margin-top:1rem;">This booking must be approved before check-in.</div>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="dash-card">
+    <div class="section-header">
+      <h2 class="dash-card-title" style="margin-bottom:0;">
+        <i class="fas fa-user-plus"></i> Customer Quick Add
+      </h2>
+      <button type="button" class="dash-btn-primary" id="openAddCustomerModal" style="margin-top:0;">
+        <i class="fas fa-plus"></i> Add New Customer
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="booking-modal-backdrop" id="addCustomerModalBackdrop" hidden>
+  <div class="booking-modal" role="dialog" aria-modal="true" aria-labelledby="addCustomerModalTitle">
+    <div class="booking-modal-header">
+      <div>
+        <h3 class="booking-modal-title" id="addCustomerModalTitle">Add New Customer</h3>
+        <p class="booking-modal-subtitle">Save a customer for future lookup.</p>
+      </div>
+      <button type="button" class="booking-modal-close" id="addCustomerModalClose" aria-label="Close add customer modal">
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </div>
+    <div class="booking-modal-body">
+      <form id="addCustomerForm" class="dash-form">
+        <div class="dash-form-group">
+          <label>Name</label>
+          <input type="text" name="name" required placeholder="Customer name" />
+        </div>
+        <div class="dash-form-group">
+          <label>Phone</label>
+          <input type="text" name="phone" required placeholder="10 digit phone number" />
+        </div>
+        <div class="dash-form-group">
+          <label>Vehicle</label>
+          <input type="text" name="vehicle" required placeholder="Vehicle number" style="text-transform:uppercase;" />
+        </div>
+        <button type="submit" class="dash-btn-primary">
+          <i class="fas fa-save"></i> Save Customer
+        </button>
+      </form>
+      <p class="booking-modal-message" id="addCustomerResult" hidden></p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function showToast(message, type) {
+    const existing = document.querySelector('.toast-notification');
+    if (existing) existing.remove();
+    
+    const toast = document.createElement('div');
+    toast.className = 'toast-notification toast-' + type;
+    toast.innerHTML = '<i class="fas fa-' + (type === 'success' ? 'check-circle' : 'exclamation-circle') + '"></i> ' + message;
+    document.body.appendChild(toast);
+    
+    setTimeout(function() {
+      toast.classList.add('show');
+    }, 10);
+    
+    setTimeout(function() {
+      toast.classList.remove('show');
+      setTimeout(function() {
+        toast.remove();
+      }, 300);
+    }, 3000);
+  }
+
+  async function handleAjaxAction(btn) {
+    const bookingId = btn.dataset.bookingId;
+    const action = btn.dataset.action;
+    const originalHTML = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    
+    try {
+      const url = action === 'reschedule-checkin'
+        ? '/admin/booking/' + bookingId + '/reschedule-checkin'
+        : '/admin/api/' + action + '/' + bookingId;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }
+      });
+      const data = await response.json();
+      
+      if (data.success) {
+        if (data.whatsapp_url) {
+          window.open(data.whatsapp_url, '_blank');
+        }
+
+        if (action === 'reschedule-checkin') {
+          showToast(data.message, 'success');
+          setTimeout(function() {
+            window.location.reload();
+          }, 700);
+          return;
+        }
+
+        updateBookingRow(bookingId, data.status);
+        updateTodayStats();
+        showToast(data.message, 'success');
+      } else {
+        showToast(data.error || 'Action failed', 'error');
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+      }
+    } catch (error) {
+      showToast('Network error. Please try again.', 'error');
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
+    }
+  }
+
+  function updateBookingRow(bookingId, newStatus) {
+    const row = document.querySelector('tr[data-booking-id="' + bookingId + '"]');
+    if (!row) return;
+    
+    row.dataset.status = newStatus;
+    
+    const statusBadge = document.getElementById('status-' + bookingId);
+    if (statusBadge) {
+      statusBadge.className = 'status-badge status-' + newStatus;
+      const statusText = newStatus === 'checked_in' ? 'Checked-In' : 
+                         newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
+      statusBadge.textContent = statusText;
+    }
+    
+    const actionsCell = document.getElementById('actions-' + bookingId);
+    if (actionsCell) {
+      let newHTML = '';
+      if (newStatus === 'approved') {
+        newHTML = '<button type="button" class="btn btn-purple btn-sm action-btn-compact ajax-action-btn" ' +
+                  'data-action="checkin" data-booking-id="' + bookingId + '">' +
+                  '<i class="fas fa-motorcycle"></i> Check-In</button>';
+      } else if (newStatus === 'checked_in') {
+        newHTML = '<button type="button" class="btn btn-success btn-sm action-btn-compact ajax-action-btn" ' +
+                  'data-action="complete" data-booking-id="' + bookingId + '">' +
+                  '<i class="fas fa-flag-checkered"></i> Complete</button>';
+      } else if (newStatus === 'completed') {
+        newHTML = '<span class="dash-sub">-</span>';
+      }
+      actionsCell.innerHTML = newHTML;
+    }
+  }
+
+  function updateTodayStats() {
+    const rows = document.querySelectorAll('.today-booking-row');
+    const counts = { pending: 0, approved: 0, checked_in: 0, completed: 0 };
+    
+    rows.forEach(function(row) {
+      const status = row.dataset.status;
+      if (counts.hasOwnProperty(status)) {
+        counts[status]++;
+      }
+    });
+    
+    const pendingEl = document.getElementById('today-pending-count');
+    const approvedEl = document.getElementById('today-approved-count');
+    const checkedInEl = document.getElementById('today-checked-in-count');
+    const completedEl = document.getElementById('today-completed-count');
+    
+    if (pendingEl) pendingEl.textContent = counts.pending;
+    if (approvedEl) approvedEl.textContent = counts.approved;
+    if (checkedInEl) checkedInEl.textContent = counts.checked_in;
+    if (completedEl) completedEl.textContent = counts.completed;
+  }
+
+  document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.ajax-action-btn');
+    if (btn) {
+      e.preventDefault();
+      handleAjaxAction(btn);
+    }
+  });
+
+  document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.loading-btn');
+    if (btn && !btn.disabled) {
+      const loadingText = btn.dataset.loadingText || 'Processing...';
+      btn.dataset.originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + loadingText;
+    }
+  });
+
+  const modalBackdrop = document.getElementById('addCustomerModalBackdrop');
+  const modalClose = document.getElementById('addCustomerModalClose');
+  const openModalButton = document.getElementById('openAddCustomerModal');
+  const addCustomerForm = document.getElementById('addCustomerForm');
+  const addCustomerResult = document.getElementById('addCustomerResult');
+
+  if (openModalButton) {
+    openModalButton.addEventListener('click', function() {
+      modalBackdrop.hidden = false;
+      document.body.classList.add('modal-open');
+      addCustomerResult.hidden = true;
+    });
+  }
+
+  if (modalClose) {
+    modalClose.addEventListener('click', function() {
+      modalBackdrop.hidden = true;
+      document.body.classList.remove('modal-open');
+      addCustomerForm.reset();
+    });
+  }
+
+  if (modalBackdrop) {
+    modalBackdrop.addEventListener('click', function(event) {
+      if (event.target === modalBackdrop) {
+        modalBackdrop.hidden = true;
+        document.body.classList.remove('modal-open');
+        addCustomerForm.reset();
+      }
+    });
+  }
+
+  if (addCustomerForm) {
+    addCustomerForm.addEventListener('submit', async function(event) {
+      event.preventDefault();
+      addCustomerResult.hidden = false;
+      addCustomerResult.textContent = 'Saving customer...';
+
+      const formData = new FormData(addCustomerForm);
+      const payload = Object.fromEntries(formData.entries());
+
+      try {
+        const response = await fetch('/admin/add-customer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          addCustomerResult.textContent = data.error || 'Customer could not be saved.';
+          addCustomerResult.style.color = '#991b1b';
+          return;
+        }
+
+        addCustomerResult.style.color = '#065f46';
+        addCustomerResult.textContent = 'Customer saved: ' + data.customer.customer_id;
+      } catch (error) {
+        addCustomerResult.style.color = '#991b1b';
+        addCustomerResult.textContent = 'Customer could not be saved right now.';
+      }
+    });
+  }
+
+  const storageKey = 'garage_whatsapp_action';
+  document.querySelectorAll('[data-whatsapp-trigger="true"]').forEach(function(element) {
+    element.addEventListener('click', function() {
+      localStorage.setItem(storageKey, JSON.stringify({
+        bookingId: element.dataset.bookingId,
+        action: element.dataset.action
+      }));
+    });
+  });
+
+  let storedAction = null;
+  try {
+    storedAction = JSON.parse(localStorage.getItem(storageKey) || 'null');
+  } catch (error) {
+    storedAction = null;
+  }
+
+  if (storedAction && storedAction.bookingId && storedAction.action) {
+    const selector = '[data-whatsapp-button="true"][data-booking-id="' + storedAction.bookingId + '"][data-action="' + storedAction.action + '"]';
+    const button = document.querySelector(selector);
+    if (button) {
+      button.style.display = 'inline-block';
+      localStorage.removeItem(storageKey);
+    }
+  }
+</script>
+
+
+<style>
+.today-control-panel {
+  margin-bottom: 1.5rem;
+}
+
+.today-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-top: 4px solid transparent;
+}
+
+.today-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+.today-pending { border-top-color: #f59e0b; }
+.today-pending i { color: #f59e0b; }
+
+.today-approved { border-top-color: #3b82f6; }
+.today-approved i { color: #3b82f6; }
+
+.today-checked-in { border-top-color: #a855f7; }
+.today-checked-in i { color: #a855f7; }
+
+.today-completed { border-top-color: #10b981; }
+.today-completed i { color: #10b981; }
+
+.status-pending {
+  background: #fef3c7;
+  color: #92400e;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.status-approved {
+  background: #dbeafe;
+  color: #1e40af;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.status-checked_in {
+  background: #e9d5ff;
+  color: #6b21a8;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.status-completed {
+  background: #d1fae5;
+  color: #065f46;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.status-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2.5rem 1rem;
+}
+
+.empty-icon {
+  font-size: 3rem;
+  color: #9ca3af;
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+.toast-notification {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  padding: 0.875rem 1.5rem;
+  border-radius: 0.5rem;
+  color: white;
+  font-weight: 500;
+  z-index: 9999;
+  transform: translateX(120%);
+  transition: transform 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.toast-notification.show {
+  transform: translateX(0);
+}
+
+.toast-success {
+  background: #10b981;
+}
+
+.toast-error {
+  background: #ef4444;
+}
+
+.btn-purple {
+  background: #a855f7;
+  color: white;
+  border: none;
+}
+
+.btn-purple:hover {
+  background: #9333ea;
+}
+
+.text-muted {
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
+.loading-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+</style>
+{% endblock %}
