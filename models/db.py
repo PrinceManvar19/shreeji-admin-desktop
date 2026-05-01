@@ -105,8 +105,8 @@ def init_db():
     seed_admins(db)
     migrate_json_data()
     migrate_customers_phone_unique(db)
-    
-    # NEW: Vehicles table + migration from customers.vehicle
+
+    # Create vehicles table and migrate from customers.vehicle
     db.executescript("""
         CREATE TABLE IF NOT EXISTS vehicles (
             plate_number TEXT PRIMARY KEY,
@@ -233,7 +233,6 @@ def migrate_slots_table(db):
     )
 
 
-# CHANGED: Enforce unique non-empty customer phone numbers for phone-based login.
 def migrate_customers_phone_unique(db):
     seen_phones = set()
     rows = db.execute(
@@ -266,9 +265,9 @@ def migrate_bookings_table(db):
         row["name"]
         for row in db.execute("PRAGMA table_info(bookings)").fetchall()
     }
-    
+
     message_flags = ["msg_approved_sent", "msg_rejected_sent", "msg_checkedin_sent", "msg_completed_sent"]
-    
+
     if "whatsapp_sent" not in booking_columns:
         db.execute(
             """
@@ -292,7 +291,7 @@ def migrate_bookings_table(db):
             ADD COLUMN is_rescheduled INTEGER NOT NULL DEFAULT 0
             """
         )
-    
+
     for flag in message_flags:
         if flag not in booking_columns:
             db.execute(
@@ -309,52 +308,53 @@ def migrate_bookings_table(db):
         WHERE status = 'in_garage'
         """
     )
-    
+
     # Data migration for existing bookings
     db.execute("""
-        UPDATE bookings 
-        SET msg_approved_sent = 1 
+        UPDATE bookings
+        SET msg_approved_sent = 1
         WHERE status IN ('checked_in', 'completed')
     """)
-    
+
     db.execute("""
-        UPDATE bookings 
-        SET msg_checkedin_sent = 1 
+        UPDATE bookings
+        SET msg_checkedin_sent = 1
         WHERE status = 'checked_in'
     """)
-    
+
     db.execute("""
-        UPDATE bookings 
-        SET msg_completed_sent = 1 
+        UPDATE bookings
+        SET msg_completed_sent = 1
         WHERE status = 'completed'
     """)
-    
+
     # Reset rejected flag if any weird data
     db.execute("""
-        UPDATE bookings 
-        SET msg_rejected_sent = 0 
+        UPDATE bookings
+        SET msg_rejected_sent = 0
         WHERE status != 'rejected'
     """)
 
+
 def migrate_vehicles():
-    """NEW: Migrate customers.vehicle → normalized vehicles table"""
+    """Migrate customers.vehicle to normalized vehicles table."""
     db = get_db()
     rows = db.execute(
         "SELECT id, vehicle FROM customers WHERE vehicle IS NOT NULL AND TRIM(vehicle) <> ''"
     ).fetchall()
-    
+
     for row in rows:
         plate_number = row["vehicle"].strip().upper()
         if plate_number:
             db.execute(
                 """
-                INSERT OR IGNORE INTO vehicles 
-                (plate_number, customer_id, brand, model) 
+                INSERT OR IGNORE INTO vehicles
+                (plate_number, customer_id, brand, model)
                 VALUES (?, ?, '', '')
                 """,
                 (plate_number, row["id"])
             )
-    
+
     db.commit()
 
 

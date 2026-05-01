@@ -5,7 +5,6 @@ from models.db import get_db
 from utils.helpers import log_action, normalize_phone
 
 
-# CHANGED: Admin split pages need reusable customer creation and lookup helpers.
 def _generate_customer_id():
     rows = get_db().execute("SELECT id FROM customers WHERE id LIKE 'CUST%'").fetchall()
     highest = 1000
@@ -47,7 +46,6 @@ def get_customer_by_phone(phone):
     return dict(row) if row else None
 
 
-# CHANGED: Login now uses the requested phone-or-customer-id lookup in one query.
 def get_customer_by_phone_or_id(identifier):
     normalized_identifier = (identifier or "").strip()
     normalized_phone = normalize_phone(normalized_identifier)
@@ -165,7 +163,6 @@ def _upsert_vehicle_record(db, customer_id, plate_number, brand="", model=""):
     }
 
 
-# CHANGED: Registration now creates a real customer row with a unique phone number.
 def create_customer(name, phone, vehicle, brand="", model=""):
     normalized_name = (name or "").strip()
     normalized_phone = normalize_phone(phone)
@@ -214,7 +211,6 @@ def create_customer(name, phone, vehicle, brand="", model=""):
     return True, "", customer
 
 
-# CHANGED: Used by /admin/add-customer and walk-in registration.
 def ensure_customer(phone, name, vehicle, brand="", model=""):
     normalized_phone = normalize_phone(phone)
     normalized_name = (name or "").strip()
@@ -246,7 +242,6 @@ def ensure_customer(phone, name, vehicle, brand="", model=""):
     return customer
 
 
-# CHANGED: Supports /admin/search-customer for the walk-in customer lookup.
 def search_customers(query, limit=5):
     normalized_query = (query or "").strip()
     if not normalized_query:
@@ -274,7 +269,7 @@ def search_customers(query, limit=5):
 
 
 def get_vehicles_by_customer(identifier):
-    """NEW: Get customer vehicles by phone or customer_id"""
+    """Get customer vehicles by phone or customer_id."""
     customer = get_customer_by_phone_or_id(identifier)
     if not customer:
         return []

@@ -16,11 +16,9 @@ from services.auth_service import ensure_session_user
 from utils.helpers import log_action
 
 
-# ============================================================================
-# CENTRALIZED DATABASE CONFIGURATION
-# ============================================================================
 # Use LOCALAPPDATA on Windows for persistent storage, fallback to project dir
 BASE_DIR = os.path.join(os.getenv("LOCALAPPDATA") or os.path.dirname(os.path.abspath(__file__)), "GarageManagement")
+
 os.makedirs(BASE_DIR, exist_ok=True)
 
 DB_PATH = os.path.join(BASE_DIR, "garage.db")
@@ -143,12 +141,10 @@ def create_app():
     def sync_session_user():
         ensure_session_user()
 
-    # ============================================================================
-    # MANUAL BACKUP ROUTE
-    # ============================================================================
     @app.route("/admin/backup-db")
     def manual_backup():
         """Create a manual backup of the database."""
+
         from flask import flash, redirect, url_for
         try:
             db_path = app.config["DATABASE"]
@@ -187,4 +183,3 @@ app = create_app()
 if __name__ == "__main__":
     app.config['TEMPLATES_AUTO_RELOAD'] = True
     app.run(host="0.0.0.0", port=5000, debug=True)
-
