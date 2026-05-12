@@ -22,34 +22,24 @@ def ensure_salary_status_column():
 
 
 def ensure_payment_columns():
-    """Ensure payment_status, paid_at, and payment_method exist for existing SQLite databases."""
+    """Ensure payment_status and paid_at exist for existing SQLite databases."""
     columns = {
         row["name"]
         for row in get_db().execute("PRAGMA table_info(salary_records)").fetchall()
     }
 
     if "payment_status" not in columns:
-        get_db().execute("ALTER TABLE salary_records ADD COLUMN payment_status TEXT DEFAULT 'pending'")
+        get_db().execute(
+            "ALTER TABLE salary_records ADD COLUMN payment_status TEXT"
+        )
 
     if "paid_at" not in columns:
         # ISO timestamp string is stored as TEXT.
-        get_db().execute("ALTER TABLE salary_records ADD COLUMN paid_at TEXT")
-
-    if "payment_method" not in columns:
-        get_db().execute("ALTER TABLE salary_records ADD COLUMN payment_method TEXT")
+        get_db().execute(
+            "ALTER TABLE salary_records ADD COLUMN paid_at TEXT"
+        )
 
     get_db().commit()
-
-
-def ensure_updated_at_column():
-    """Ensure updated_at exists for existing SQLite databases."""
-    columns = {
-        row["name"]
-        for row in get_db().execute("PRAGMA table_info(salary_records)").fetchall()
-    }
-    if "updated_at" not in columns:
-        get_db().execute("ALTER TABLE salary_records ADD COLUMN updated_at TEXT")
-        get_db().commit()
 
 
 def _normalize_paid_fields(salary_status, payment_status):
@@ -62,16 +52,8 @@ def _normalize_paid_fields(salary_status, payment_status):
 
 def mark_salary_as_paid(record_id, admin_user_id=None):
     """Mark a salary record as paid and lock it from further edits."""
-    # Ensure columns exist first (and commit inside ensure_*), so SQLite has them.
     ensure_salary_status_column()
     ensure_payment_columns()
-    ensure_updated_at_column()
-
-    # Re-fetch AFTER all ensures have committed.
-    columns = {
-        row["name"]
-        for row in get_db().execute("PRAGMA table_info(salary_records)").fetchall()
-    }
 
     record = get_salary_record(record_id)
     if not record:
@@ -81,24 +63,20 @@ def mark_salary_as_paid(record_id, admin_user_id=None):
     if current_status == "paid":
         return False, "This payroll record is already marked as PAID"
 
+    # Persist lock fields
     now = datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
-
-    set_parts = [
-        "salary_status = 'paid'",
-        "payment_status = 'paid'",
-        "paid_at = ?",
-    ]
-    params = [now]
-
-    if "updated_at" in columns:
-        set_parts.append("updated_at = ?")
-        params.append(now)
-
-    params.append(record_id)
-    sql = f"UPDATE salary_records SET {', '.join(set_parts)} WHERE id = ?"
-
     try:
-        get_db().execute(sql, params)
+        get_db().execute(
+            """
+            UPDATE salary_records
+            SET salary_status = 'paid',
+                payment_status = 'paid',
+                paid_at = ?,
+                updated_at = COALESCE(updated_at, CURRENT_TIMESTAMP)
+            WHERE id = ?
+            """,
+            (now, record_id),
+        )
         get_db().commit()
         log_action(
             "SALARY_RECORD_MARKED_PAID",
@@ -107,9 +85,8 @@ def mark_salary_as_paid(record_id, admin_user_id=None):
         return True, "Salary record marked as paid and locked"
     except Exception as e:
         get_db().rollback()
+        log_action("SALARY_RECORD_MARK_PAID_ERROR", str(e))
         return False, f"Failed to mark as paid: {str(e)}"
-
-
 
 
 
@@ -118,37 +95,7 @@ def _normalize_salary_status(status, default="finalized"):
     return status if status in VALID_SALARY_STATUSES else default
 
 
-def update_salary_payment_info(record_id, payment_method=None):
-    """Save payment_method (and optionally payment_status) to an existing record."""
-    if payment_method is None and payment_method != "":
-        return
-
-    ensure_payment_columns()
-    columns = {
-        row["name"]
-        for row in get_db().execute("PRAGMA table_info(salary_records)").fetchall()
-    }
-
-    parts, params = [], []
-    if payment_method is not None and "payment_method" in columns and str(payment_method).strip():
-        parts.append("payment_method = ?")
-        params.append(payment_method.strip())
-
-    if not parts:
-        return
-
-    params.append(record_id)
-    get_db().execute(
-        f"UPDATE salary_records SET {', '.join(parts)} WHERE id = ?",
-        params,
-    )
-    get_db().commit()
-
-
-
-
-
-def save_salary_record(worker_id, total_days, attended_days, bonus_val, bonus_pct, ot_val, ot_pct, comm_val, comm_pct, month=None, year=None, salary_status="finalized", payment_method=None, payment_status=None):
+def save_salary_record(worker_id, total_days, attended_days, bonus_val, bonus_pct, ot_val, ot_pct, comm_val, comm_pct, month=None, year=None, salary_status="finalized"):
     """
     Save salary calculation to salary_records.
     Prevents duplicate (worker_id, month, year).
@@ -172,17 +119,6 @@ def save_salary_record(worker_id, total_days, attended_days, bonus_val, bonus_pc
     month = month or f"{now.month:02d}"
     year = year or now.year
     salary_status = _normalize_salary_status(salary_status)
-
-    # Payment defaults
-    if payment_status is None:
-        payment_status = "pending"
-    if payment_method is None:
-        payment_method = None
-
-    # Normalize paid consistency
-    if str(salary_status).strip().lower() == "paid" and str(payment_status).strip().lower() != "paid":
-        payment_status = "paid"
-
 
     # Check duplicate
     existing = get_db().execute(
@@ -212,52 +148,18 @@ def save_salary_record(worker_id, total_days, attended_days, bonus_val, bonus_pc
     comm_amt = calc_result['commission_amount']
     total = calc_result['total_salary']
 
-    # Persist final/payable fields.
-    # This app's current salary schema doesn't persist deductions/advances, so
-    # keep final payable aligned to computed total.
-    final_payable_salary = total
-    net_payable = total
-    net_salary = total
-
     try:
-        # Ensure payment columns exist before inserting
-        ensure_payment_columns()
-        ensure_updated_at_column()
-
-        columns = {
-            row["name"]
-            for row in get_db().execute("PRAGMA table_info(salary_records)").fetchall()
-        }
-
-        insert_cols = [
-            "worker_id", "month", "year", "total_days", "attended_days",
-            "per_day_salary", "base_salary", "bonus", "overtime", "commission", "total_salary",
-            "salary_status",
-        ]
-        insert_vals = [
+        get_db().execute("""
+            INSERT INTO salary_records (
+                worker_id, month, year, total_days, attended_days,
+                per_day_salary, base_salary, bonus, overtime, commission, total_salary,
+                salary_status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
             worker_id, month, year, total_days, attended_days,
             float(per_day), float(base), float(bonus_amt), float(ot_amt), float(comm_amt), float(total),
-            salary_status,
-        ]
-
-        if "payment_status" in columns:
-            insert_cols.append("payment_status")
-            insert_vals.append(payment_status)
-
-        if "payment_method" in columns:
-            insert_cols.append("payment_method")
-            insert_vals.append(payment_method)
-
-        if payment_status and str(payment_status).strip().lower() == "paid" and "paid_at" in columns:
-            insert_cols.append("paid_at")
-            insert_vals.append(datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z")
-
-        placeholders = ", ".join(["?"] * len(insert_vals))
-        cols_sql = ", ".join(insert_cols)
-
-        get_db().execute(f"""
-            INSERT INTO salary_records ({cols_sql}) VALUES ({placeholders})
-        """, tuple(insert_vals))
+            salary_status
+        ))
         get_db().commit()
         last_row = get_db().execute("SELECT last_insert_rowid() as id").fetchone()
         record_id = last_row['id']
@@ -332,22 +234,17 @@ def update_salary_record(record_id, total_days=None, attended_days=None, bonus_v
     worker_id = record['worker_id']
     worker_monthly = record.get('worker_monthly_salary') or 0
 
-    # Use current values as defaults (important: do NOT reset to 0 when fields are omitted)
-    total_days = record['total_days'] if total_days is None else total_days
-    attended_days = record['attended_days'] if attended_days is None else attended_days
 
-    # Preserve existing bonus/ot/commission values if not supplied.
-    bonus_val = record.get('bonus') if bonus_val is None else bonus_val
-    bonus_pct = record.get('bonus_is_percent') if bonus_pct is None else bonus_pct
-
-    ot_val = record.get('overtime') if ot_val is None else ot_val
-    ot_pct = record.get('overtime_is_percent') if ot_pct is None else ot_pct
-
-    comm_val = record.get('commission') if comm_val is None else comm_val
-    comm_pct = record.get('commission_is_percent') if comm_pct is None else comm_pct
-
+    # Use current values as defaults
+    total_days = total_days if total_days is not None else record['total_days']
+    attended_days = attended_days if attended_days is not None else record['attended_days']
+    bonus_val = bonus_val if bonus_val is not None else 0
+    bonus_pct = bonus_pct if bonus_pct is not None else False
+    ot_val = ot_val if ot_val is not None else 0
+    ot_pct = ot_pct if ot_pct is not None else False
+    comm_val = comm_val if comm_val is not None else 0
+    comm_pct = comm_pct if comm_pct is not None else False
     salary_status = _normalize_salary_status(salary_status, record.get("salary_status") or "finalized")
-
 
     # Recalculate
     try:
@@ -369,63 +266,21 @@ def update_salary_record(record_id, total_days=None, attended_days=None, bonus_v
     comm_amt = calc_result['commission_amount']
     total = calc_result['total_salary']
 
-    # Persist payable-aligned fields too (required for correct PDF/render).
-    final_payable_salary = total
-    net_payable = total
-    net_salary = total
-
-    # Check which columns exist (avoid breaking old DBs).
-    columns = {
-        row["name"]
-        for row in get_db().execute("PRAGMA table_info(salary_records)").fetchall()
-    }
-
-    set_parts = [
-        "total_days = ?",
-        "attended_days = ?",
-        "per_day_salary = ?",
-        "base_salary = ?",
-        "bonus = ?",
-        "overtime = ?",
-        "commission = ?",
-        "total_salary = ?",
-        "salary_status = ?",
-    ]
-    params = [
-        total_days,
-        attended_days,
-        float(per_day),
-        float(base),
-        float(bonus_amt),
-        float(ot_amt),
-        float(comm_amt),
-        float(total),
-        salary_status,
-    ]
-
-    # Update only if those columns exist.
-    if "final_payable_salary" in columns:
-        set_parts.append("final_payable_salary = ?")
-        params.append(float(final_payable_salary))
-    if "net_payable" in columns:
-        set_parts.append("net_payable = ?")
-        params.append(float(net_payable))
-    if "net_salary" in columns:
-        set_parts.append("net_salary = ?")
-        params.append(float(net_salary))
-
-    # If someone submitted salary_status=paid via update form, keep paid_at/payment_status consistent.
-    if salary_status == "paid":
-        if "payment_status" in columns:
-            set_parts.append("payment_status = 'paid'")
-        if "paid_at" in columns:
-            set_parts.append("paid_at = ?")
-            params.append(datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z")
-
     try:
-        sql = f"UPDATE salary_records SET {', '.join(set_parts)} WHERE id = ?"
-        params.append(record_id)
-        get_db().execute(sql, tuple(params))
+        get_db().execute("""
+            UPDATE salary_records
+            SET total_days = ?, attended_days = ?,
+                per_day_salary = ?, base_salary = ?,
+                bonus = ?, overtime = ?, commission = ?, total_salary = ?,
+                salary_status = ?
+            WHERE id = ?
+        """, (
+            total_days, attended_days,
+            float(per_day), float(base),
+            float(bonus_amt), float(ot_amt), float(comm_amt), float(total),
+            salary_status,
+            record_id
+        ))
         get_db().commit()
         log_action("SALARY_RECORD_UPDATED", f"ID {record_id} total={total:.2f}")
         return True, "Record updated successfully"

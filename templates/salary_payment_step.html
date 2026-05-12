@@ -1,0 +1,107 @@
+{% extends "admin_base.html" %}
+{% block title %}Payment Details — Payslip #{{ record.id }}{% endblock %}
+
+{% block content %}
+<style>
+  .pay-step-page { max-width:520px; margin:3rem auto; padding:0 1.5rem; }
+  .pay-step-card { background:#fff; border:1px solid var(--border); border-radius:16px;
+                   box-shadow:var(--shadow-card); overflow:hidden; }
+  .pay-step-header { padding:1.25rem 1.5rem; background:linear-gradient(135deg,#17171b,#2b2b31);
+                     color:#fff; }
+  .pay-step-header h2 { font-family:var(--font-head); font-size:1.2rem; font-weight:900;
+                        margin:0 0 0.2rem; }
+  .pay-step-header p  { margin:0; font-size:0.85rem; color:rgba(255,255,255,0.62); }
+  .pay-step-body  { padding:1.5rem; }
+  .field-label { display:block; font-size:0.75rem; font-weight:900; letter-spacing:0.06em;
+                 text-transform:uppercase; color:var(--text-muted); margin-bottom:0.4rem; }
+  .pay-select, .pay-radio-group { width:100%; padding:0.65rem 0.78rem;
+                                   border:1.5px solid var(--border); border-radius:9px;
+                                   background:#fff; outline:none; }
+  .pay-select:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(162,4,5,0.1); }
+  .radio-row { display:flex; gap:1rem; margin-top:0.35rem; }
+  .radio-row label { display:flex; align-items:center; gap:0.45rem; font-weight:700;
+                     cursor:pointer; font-size:0.9rem; }
+  .radio-row input[type=radio] { accent-color:var(--accent); width:16px; height:16px; }
+  .info-row { display:flex; justify-content:space-between; align-items:center;
+              padding:0.55rem 0; border-bottom:1px solid #f0f0f3; font-size:0.88rem; }
+  .info-row:last-child { border-bottom:0; }
+  .info-row span { color:var(--text-muted); }
+  .info-row strong { font-family:var(--font-head); font-weight:900; }
+  .btn-primary { width:100%; padding:0.9rem; border:0; border-radius:12px;
+                 background:linear-gradient(135deg,#a20405,#d9393a); color:#fff;
+                 font-weight:900; font-size:1rem; cursor:pointer;
+                 box-shadow:0 8px 20px rgba(162,4,5,0.25); transition:transform .15s; }
+  .btn-primary:hover { transform:translateY(-1px); }
+  .btn-back { display:inline-flex; align-items:center; gap:0.4rem;
+              color:var(--text-muted); font-size:0.85rem; font-weight:700;
+              margin-bottom:1.25rem; }
+  .btn-back:hover { color:var(--accent); }
+</style>
+
+{% set month_names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] %}
+
+<div class="pay-step-page">
+  <a href="{{ url_for('salary.salary_history') }}" class="btn-back">
+    <i class="fas fa-arrow-left"></i> Back to History
+  </a>
+
+  <div class="pay-step-card">
+    <div class="pay-step-header">
+      <h2><i class="fas fa-file-invoice-dollar"></i> Payment Details</h2>
+      <p>Fill in payment info — the payslip PDF will download immediately after.</p>
+    </div>
+
+    <div class="pay-step-body">
+      <div style="background:#f9fafb; border:1px solid #ebebef; border-radius:10px;
+                  padding:0.9rem 1rem; margin-bottom:1.25rem;">
+        <div class="info-row">
+          <span>Worker</span>
+          <strong>{{ record.worker_name or record.worker_id }}</strong>
+        </div>
+        <div class="info-row">
+          <span>Period</span>
+          <strong>{{ month_names[(record.month|int) - 1] }} {{ record.year }}</strong>
+        </div>
+        <div class="info-row">
+          <span>Net Payable</span>
+          <strong style="color:var(--accent);">
+            &#8377;{{ "%.2f"|format(record.total_salary|float) }}
+          </strong>
+        </div>
+      </div>
+
+      <form method="POST">
+        <div style="margin-bottom:1.1rem;">
+          <label class="field-label" for="payment_method">Payment Method</label>
+          <select class="pay-select" name="payment_method" id="payment_method" required>
+            <option value="">— Select —</option>
+            <option value="Cash">Cash</option>
+            <option value="Bank Transfer">Bank Transfer</option>
+            <option value="UPI">UPI</option>
+            <option value="Cheque">Cheque</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom:1.5rem;">
+          <label class="field-label">Payment Done?</label>
+          <div class="radio-row">
+            <label>
+              <input type="radio" name="payment_done" value="yes" required>
+              Yes, payment is done
+            </label>
+            <label>
+              <input type="radio" name="payment_done" value="no" required>
+              No, not yet
+            </label>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-primary">
+          <i class="fas fa-download"></i> Generate &amp; Download Payslip
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

@@ -4,6 +4,7 @@
 {% block content %}
 <style>
   .salary-page { max-width:1280px; margin:0 auto; padding:2rem 1.5rem 3rem; }
+
   .salary-header { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1.35rem; flex-wrap:wrap; }
   .salary-title { display:flex; align-items:center; gap:0.9rem; }
   .salary-icon { width:52px; height:52px; border-radius:13px; background:linear-gradient(135deg,#a20405,#c9393a); color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 12px 28px rgba(162,4,5,0.25); }
@@ -74,7 +75,10 @@
   </div>
 
   <form id="salaryForm" method="POST">
-    <input type="hidden" name="salary_status" value="finalized" id="salary_status_hidden">
+<!-- Submission flags for server workflow (do not duplicate) -->
+<!-- (hidden inputs already exist at top of form) -->
+
+
     <div class="salary-grid">
       <div class="salary-left">
         <section class="pay-card">
@@ -112,7 +116,7 @@
             <h3><i class="fas fa-user-check"></i> Worker & Attendance</h3>
           </div>
           <div class="pay-card-body">
-            <div class="form-grid-2">
+<div class="form-grid-2">
               <div>
                 <label class="salary-label" for="worker_id">Worker</label>
                 <select class="salary-select" id="worker_id" name="worker_id" required>
@@ -128,6 +132,36 @@
                 <label class="salary-label" for="attended_days">Days Attended</label>
                 <input type="number" class="salary-input" id="attended_days" name="attended_days" step="0.5" min="0" value="{{ current_total_days }}" required>
               </div>
+            </div>
+
+            <!-- Attendance mode toggle -->
+            <div style="display:flex; align-items:center; justify-content:space-between;
+            margin-top:0.85rem; margin-bottom:0.5rem; gap:1rem;">
+              <div style="font-size:0.78rem; font-weight:900; color:var(--text-muted);
+              text-transform:uppercase; letter-spacing:0.05em;">
+                Attendance Entry
+              </div>
+              <div style="display:flex; gap:0.5rem;">
+                <button type="button" id="btnAttManual"
+                class="btn-ghost" style="padding:0.35rem 0.75rem; font-size:0.78rem;"
+                aria-pressed="false">
+                  <i class="fas fa-pencil"></i> Manual
+                </button>
+                <button type="button" id="btnAttAuto"
+                class="btn-ghost" style="padding:0.35rem 0.75rem; font-size:0.78rem;"
+                aria-pressed="false">
+                  <i class="fas fa-bolt"></i> Auto-fill
+                </button>
+              </div>
+            </div>
+
+            <!-- Auto-fill status banner (hidden by default) -->
+            <div id="autoFillBanner" style="display:none; align-items:center; gap:0.6rem;
+     padding:0.65rem 0.85rem; border-radius:9px; background:#eff6ff;
+     border:1px solid #bfdbfe; font-size:0.84rem; font-weight:800;
+     color:#1d4ed8; margin-bottom:0.5rem;">
+              <i class="fas fa-circle-info"></i>
+              <span id="autoFillMsg">Fetching attendance…</span>
             </div>
             <div class="attendance-bar"><div class="attendance-fill" id="attendanceFill"></div></div>
             <div class="worker-strip">
@@ -183,17 +217,26 @@
           <div class="summary-row"><span>Bonus</span><strong id="summaryBonus">&#8377;0.00</strong></div>
           <div class="summary-row"><span>Overtime</span><strong id="summaryOT">&#8377;0.00</strong></div>
           <div class="summary-row"><span>Commission</span><strong id="summaryComm">&#8377;0.00</strong></div>
-          <div class="summary-row net"><span>Total Earnings</span><strong id="summaryNet">&#8377;0.00</strong></div>
-          <div style="display:grid; gap:0.65rem;">
-            <button type="submit" class="btn-save-pdf mt-3" data-loading-submit data-loading-text="Saving..." id="btnFinalize">
-              <i class="fas fa-file-pdf"></i> Save & Generate Payslip
-            </button>
-            <button type="submit" class="btn-ghost" style="width:100%;" id="btnDraft" data-loading-submit data-loading-text="Saving..." aria-label="Save as Draft">
-              <i class="fas fa-floppy-disk"></i> Save as Draft
-            </button>
-          </div>
+<div class="summary-row net"><span>Total Earnings</span><strong id="summaryNet">&#8377;0.00</strong></div>
+
+<input type="hidden" name="salary_status" id="salary_status_hidden" value="finalized">
+<input type="hidden" name="generate_slip" id="generate_slip_flag" value="0">
+
+<div style="display:grid; gap:0.65rem; margin-top:1rem;">
+  <button type="submit" class="btn-save-pdf" id="btnSaveGenerate"
+          data-loading-text="Saving…">
+    <i class="fas fa-file-invoice-dollar"></i> Save &amp; Generate Slip
+  </button>
+
+  <button type="submit" class="btn-ghost" style="width:100%;" id="btnDraft"
+          data-loading-text="Saving…">
+    <i class="fas fa-floppy-disk"></i> Save as Draft
+  </button>
+</div>
+
         </div>
       </aside>
+
     </div>
   </form>
 </div>
@@ -282,36 +325,165 @@
     recalculate();
   }
 
-  document.addEventListener('DOMContentLoaded', function() {
-    const statusHidden = document.getElementById('salary_status_hidden');
-    const btnDraft = document.getElementById('btnDraft');
-    const btnFinalize = document.getElementById('btnFinalize');
-
-    if (statusHidden && btnDraft) {
-      btnDraft.addEventListener('click', function() {
-        statusHidden.value = 'draft';
-      });
-    }
-    if (statusHidden && btnFinalize) {
-      btnFinalize.addEventListener('click', function() {
-        statusHidden.value = 'finalized';
-      });
-    }
-
-    ['month','year'].forEach(function(id) {
-      document.getElementById(id).addEventListener('change', updatePeriodDays);
-    });
-
-    ['worker_id','total_days','attended_days','bonus_value','ot_value','comm_value'].forEach(function(id) {
-      document.getElementById(id).addEventListener(id === 'worker_id' ? 'change' : 'input', id === 'worker_id' ? loadWorker : recalculate);
-    });
-    ['bonus','ot','comm'].forEach(function(name) {
-      document.querySelectorAll('input[name="' + name + '_type"]').forEach(function(input) {
-        input.addEventListener('change', recalculate);
-      });
-    });
-    loadWorker();
+  document.getElementById('btnSaveGenerate')?.addEventListener('click', function() {
+    document.getElementById('salary_status_hidden').value = 'finalized';
+    document.getElementById('generate_slip_flag').value = '1';
   });
+  document.getElementById('btnDraft')?.addEventListener('click', function() {
+    document.getElementById('salary_status_hidden').value = 'draft';
+    document.getElementById('generate_slip_flag').value = '0';
+  });
+
+  ['month','year'].forEach(function(id) {
+    document.getElementById(id).addEventListener('change', updatePeriodDays);
+  });
+
+  ['worker_id','total_days','attended_days','bonus_value','ot_value','comm_value'].forEach(function(id) {
+    document.getElementById(id).addEventListener(
+      id === 'worker_id' ? 'change' : 'input',
+      id === 'worker_id' ? loadWorker : recalculate
+    );
+  });
+
+
+  ['bonus','ot','comm'].forEach(function(name) {
+    document.querySelectorAll('input[name="' + name + '_type"]').forEach(function(input) {
+      input.addEventListener('change', recalculate);
+    });
+  });
+  // --- Attendance auto-fill integration ---
+  var attMode = 'manual'; // 'manual' | 'auto'
+
+  function setAttMode(mode) {
+    attMode = mode;
+    var manualBtn = document.getElementById('btnAttManual');
+    var autoBtn = document.getElementById('btnAttAuto');
+    var banner = document.getElementById('autoFillBanner');
+    var attendedInput = document.getElementById('attended_days');
+
+    if (mode === 'auto') {
+      if (manualBtn) { manualBtn.style.background = ''; manualBtn.style.color = ''; }
+      if (autoBtn) { autoBtn.style.background = 'var(--accent)'; autoBtn.style.color = '#fff'; autoBtn.style.borderColor = 'var(--accent)'; }
+      if (attendedInput) {
+        attendedInput.readOnly = true;
+        attendedInput.style.background = '#f5f5f7';
+      }
+      if (banner) banner.style.display = 'flex';
+      fetchAutoAttendance();
+    } else {
+      if (autoBtn) { autoBtn.style.background = ''; autoBtn.style.color = ''; autoBtn.style.borderColor = ''; }
+      if (manualBtn) { manualBtn.style.background = 'var(--accent)'; manualBtn.style.color = '#fff'; manualBtn.style.borderColor = 'var(--accent)'; }
+      if (attendedInput) {
+        attendedInput.readOnly = false;
+        attendedInput.style.background = '';
+      }
+      if (banner) banner.style.display = 'none';
+    }
+  }
+
+  function fetchAutoAttendance() {
+    var workerId = document.getElementById('worker_id') ? document.getElementById('worker_id').value : '';
+    var month = document.getElementById('month') ? document.getElementById('month').value : '';
+    var year = document.getElementById('year') ? document.getElementById('year').value : '';
+    var banner = document.getElementById('autoFillBanner');
+    var msg = document.getElementById('autoFillMsg');
+
+    if (!workerId) {
+      if (msg) msg.textContent = 'Please select a worker first.';
+      if (banner) {
+        banner.style.background = '#fffbeb';
+        banner.style.borderColor = '#fde68a';
+        banner.style.color = '#92400e';
+      }
+      return;
+    }
+
+    if (!month || !year) return;
+
+    if (msg) msg.textContent = 'Fetching attendance records…';
+    if (banner) {
+      banner.style.background = '#eff6ff';
+      banner.style.borderColor = '#bfdbfe';
+      banner.style.color = '#1d4ed8';
+      banner.style.display = 'flex';
+    }
+
+    var url = '/admin/salary/attendance-preview?worker_id=' + encodeURIComponent(workerId)
+      + '&month=' + encodeURIComponent(month)
+      + '&year=' + encodeURIComponent(year);
+
+    fetch(url)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.error) {
+          if (msg) msg.textContent = 'Error: ' + data.error;
+          if (banner) {
+            banner.style.background = '#fef2f2';
+            banner.style.borderColor = '#fecaca';
+            banner.style.color = '#dc2626';
+          }
+          return;
+        }
+        if (!data.has_records) {
+          if (msg) msg.textContent = 'No attendance records found for this period. Switch to Manual.';
+          if (banner) {
+            banner.style.background = '#fffbeb';
+            banner.style.borderColor = '#fde68a';
+            banner.style.color = '#92400e';
+          }
+          return;
+        }
+
+        var attendedInput = document.getElementById('attended_days');
+        if (attendedInput) attendedInput.value = data.attended_days;
+        if (attendedInput) attendedInput.dispatchEvent(new Event('input'));
+
+        document.getElementById('total_days').value = data.total_days;
+
+        if (attendedInput) attendedInput.value = data.attended_days;
+        recalculate();
+
+        var missing = (data.missing_days > 0) ? (' (' + data.missing_days + ' days unrecorded)') : '';
+        if (msg) msg.textContent = 'Auto-filled: ' + data.attended_days + ' of ' + data.total_days + ' days attended' + missing + '.';
+
+        if (banner) {
+          banner.style.background = '#ecfdf3';
+          banner.style.borderColor = '#abefc6';
+          banner.style.color = '#067647';
+        }
+      })
+      .catch(function() {
+        if (msg) msg.textContent = 'Could not fetch attendance data.';
+        if (banner) {
+          banner.style.background = '#fef2f2';
+          banner.style.borderColor = '#fecaca';
+          banner.style.color = '#dc2626';
+        }
+      });
+  }
+
+  // initial wire
+  var manualBtn0 = document.getElementById('btnAttManual');
+  var autoBtn0 = document.getElementById('btnAttAuto');
+  if (manualBtn0) manualBtn0.addEventListener('click', function() { setAttMode('manual'); });
+  if (autoBtn0) autoBtn0.addEventListener('click', function() { setAttMode('auto'); });
+
+  ['month','year'].forEach(function(id) {
+    document.getElementById(id).addEventListener('change', function() {
+      if (attMode === 'auto') fetchAutoAttendance();
+    });
+  });
+
+  // When worker changes, refresh if in auto mode
+  var origLoadWorker = loadWorker;
+  loadWorker = function() {
+    origLoadWorker();
+    if (attMode === 'auto') fetchAutoAttendance();
+  };
+
+  // Default to manual (leave existing behavior)
+  loadWorker();
 })();
 </script>
+
 {% endblock %}

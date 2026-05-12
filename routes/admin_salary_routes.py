@@ -7,6 +7,7 @@ from models.worker_model import create_worker, delete_worker, generate_next_work
 from models.salary_model import get_salary_records, get_salary_record, update_salary_record
 
 
+
 salary_bp = Blueprint("salary", __name__, url_prefix="/admin/salary")
 
 
@@ -107,18 +108,28 @@ def salary_calculator():
         salary_status = request.form.get("salary_status", "finalized").strip()
 
         from models.salary_model import save_salary_record
+        generate_slip = request.form.get("generate_slip", "0") == "1"
+        salary_status = request.form.get("salary_status", "finalized").strip()
+
         success, message, record_id = save_salary_record(
-            worker_id, total_days, attended_days, bonus_val, bonus_pct,
-            ot_val, ot_pct, comm_val, comm_pct,
+            worker_id, total_days, attended_days,
+            bonus_val, bonus_pct,
+            ot_val, ot_pct,
+            comm_val, comm_pct,
             month=month if month else None,
             year=year,
             salary_status=salary_status
         )
+
         if success:
-            flash(f"Salary record saved. Payslip download started for record #{record_id}.", "success")
-            return redirect(url_for("salary.salary_pdf", record_id=record_id))
+            if generate_slip:
+                return redirect(url_for("salary.salary_payment_step", record_id=record_id))
+            else:
+                flash(f"Salary record saved as draft (#{record_id}).", "success")
+                return redirect(url_for("salary.salary_history"))
         else:
             flash(message, "error")
+
 
     return render_template(
         "admin_salary.html",
@@ -166,14 +177,20 @@ def edit_salary_record(record_id):
     if admin_guard is not None:
         return admin_guard
     
+    record = get_salary_record(record_id)
+    if not record:
+        flash("Salary record not found", "error")
+        return redirect(url_for("salary.salary_history"))
+
+    # Safety guard — edit is draft-only
     if request.method == "GET":
-        record = get_salary_record(record_id)
-        if not record:
-            flash("Salary record not found", "error")
+        if (record.get("salary_status") or "finalized").lower() != "draft":
+            flash("Only draft records can be edited.", "warning")
             return redirect(url_for("salary.salary_history"))
         
         worker = get_worker(record['worker_id'])
         return render_template("salary_history_edit.html", record=record, worker=worker)
+
     
     # POST
     try:
@@ -212,9 +229,26 @@ def edit_salary_record(record_id):
         worker = get_worker(record['worker_id']) if record else None
         return render_template("salary_history_edit.html", record=record, worker=worker)
 
+@salary_bp.route("/<int:record_id>/mark-paid", methods=["POST"])
+def mark_salary_paid(record_id):
+    admin_guard = _require_admin()
+    if admin_guard is not None:
+        return admin_guard
+
+    from models.salary_model import mark_salary_as_paid
+
+    success, message = mark_salary_as_paid(record_id, admin_user_id=_get_current_user_id())
+    if success:
+        flash(message, "success")
+    else:
+        flash(message, "error")
+    return redirect(url_for("salary.salary_history"))
+
+
 @salary_bp.route("/<int:record_id>/pdf")
 def salary_pdf(record_id):
     admin_guard = _require_admin()
+
     if admin_guard is not None:
         return admin_guard
     
@@ -226,8 +260,77 @@ def salary_pdf(record_id):
         return redirect(url_for("salary.salary_calculator"))
 
 
+@salary_bp.route("/attendance-preview", methods=["GET"])
+def attendance_preview():
+    """Return JSON attendance summary for a worker+month+year."""
+    admin_guard = _require_admin()
+    if admin_guard is not None:
+        from flask import jsonify
+        return jsonify({"error": "Unauthorized"}), 403
+
+    from flask import jsonify
+    from services.attendance_service import get_attendance_preview_for_worker
+
+    worker_id = request.args.get("worker_id", "").strip().upper()
+    month = request.args.get("month", "").strip()
+    year = request.args.get("year", "").strip()
+
+    if not (worker_id and month and year):
+        return jsonify({"error": "Missing params"}), 400
+
+    try:
+        data = get_attendance_preview_for_worker(worker_id, int(year), month)
+        return jsonify({
+            "attended_days": data["attended_days"],
+            "total_days": data["total_days"],
+            "present_days": data["present_days"],
+            "half_days": data["half_days"],
+            "absent_days": data["absent_days"],
+            "has_records": data["has_any_records"],
+            "missing_days": data["missing_days"],
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@salary_bp.route("/<int:record_id>/payment-step", methods=["GET", "POST"])
+def salary_payment_step(record_id):
+    admin_guard = _require_admin()
+    if admin_guard is not None:
+        return admin_guard
+
+    record = get_salary_record(record_id)
+    if not record:
+        flash("Salary record not found.", "error")
+        return redirect(url_for("salary.salary_history"))
+
+    if request.method == "POST":
+        payment_method = request.form.get("payment_method", "").strip()
+        payment_done = request.form.get("payment_done", "no")
+
+        if not payment_method:
+            flash("Please select a payment method.", "error")
+            return render_template("salary_payment_step.html", record=record)
+
+        from models.salary_model import update_salary_payment_info, mark_salary_as_paid
+        update_salary_payment_info(record_id, payment_method=payment_method)
+
+        if payment_done == "yes":
+            mark_salary_as_paid(record_id, admin_user_id=_get_current_user_id())
+
+        from utils.pdf_generator import send_salary_pdf
+        try:
+            return send_salary_pdf(record_id)
+        except Exception as e:
+            flash(f"PDF generation failed: {str(e)}", "error")
+            return redirect(url_for("salary.salary_history"))
+
+    return render_template("salary_payment_step.html", record=record)
+
+
 @salary_bp.route("/workers/<worker_id>/edit", methods=["GET", "POST"])
 def edit_worker(worker_id):
+
     admin_guard = _require_admin()
     if admin_guard is not None:
         return admin_guard

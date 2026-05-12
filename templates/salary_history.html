@@ -193,9 +193,34 @@
             <td>
               <div class="actions">
                 <a href="{{ url_for('salary.salary_pdf', record_id=r.id) }}" class="act pdf" title="Download PDF Payslip"><i class="fas fa-file-pdf"></i> PDF</a>
-                <a href="{{ url_for('salary.edit_salary_record', record_id=r.id) }}" class="act edit" title="Edit salary record"><i class="fas fa-pen"></i> Edit</a>
+
+
+                {% if status != 'paid' %}
+                  <a href="{{ url_for('salary.edit_salary_record', record_id=r.id) }}"
+                     class="act edit"
+                     title="Edit salary record">
+                    <i class="fas fa-pen"></i> Edit
+                  </a>
+                {% else %}
+                  <div class="act" style="background:#ecfdf3;border-color:#abefc6;color:#067647;">
+                    <i class="fas fa-check-circle"></i> ✓ Paid
+                  </div>
+                {% endif %}
               </div>
+
+
+              {% if status == 'paid' %}
+
+                <div style="margin-top:0.35rem; color:var(--text-muted); font-size:0.78rem; font-weight:800;">
+                  {% if r.paid_at %}
+                    Paid on: {{ r.paid_at.split('T')[0] | replace('-','-') }}
+                  {% else %}
+                    Paid on: —
+                  {% endif %}
+                </div>
+              {% endif %}
             </td>
+
           </tr>
           {% endfor %}
         </tbody>

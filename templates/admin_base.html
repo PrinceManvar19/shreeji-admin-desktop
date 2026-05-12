@@ -205,7 +205,14 @@
         <a href="/admin/salary/history" class="admin-sidebar-link {% if request.path.startswith('/admin/salary/history') %}active{% endif %}">
           <i class="fas fa-history"></i> Salary History
         </a>
+        <a href="/admin/attendance" class="admin-sidebar-link {% if request.path.startswith('/admin/attendance') %}active{% endif %}">
+          <i class="fas fa-clipboard-check"></i> Attendance
+        </a>
+        <a href="/admin/attendance/history" class="admin-sidebar-link {% if request.path.startswith('/admin/attendance/history') %}active{% endif %}">
+          <i class="fas fa-clock-rotate-left"></i> Attendance History
+        </a>
       </nav>
+
 
       <a href="/logout" class="admin-sidebar-link admin-sidebar-logout">
         <i class="fas fa-sign-out-alt"></i> Logout
