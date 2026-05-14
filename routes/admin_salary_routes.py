@@ -182,12 +182,8 @@ def edit_salary_record(record_id):
         flash("Salary record not found", "error")
         return redirect(url_for("salary.salary_history"))
 
-    # Safety guard — edit is draft-only
+    # GET: allow viewing paid records too (UI will lock inputs / show banner)
     if request.method == "GET":
-        if (record.get("salary_status") or "finalized").lower() != "draft":
-            flash("Only draft records can be edited.", "warning")
-            return redirect(url_for("salary.salary_history"))
-        
         worker = get_worker(record['worker_id'])
         return render_template("salary_history_edit.html", record=record, worker=worker)
 
