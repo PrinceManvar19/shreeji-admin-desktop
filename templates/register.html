@@ -28,6 +28,12 @@
 
       <label class="form-label" for="regVehicle">Vehicle Number *</label>
       <input type="text" class="form-control auth-input" id="regVehicle" name="vehicle" placeholder="MH 04 XX 1234" required data-normalize="plate">
+      <small style="color:#6b7280; font-size:0.8rem; margin-top:0.25rem; display:block;">
+        Format: GJ01AB1234 (state code + numbers + letters)
+      </small>
+      <small style="color:#6b7280; font-size:0.8rem; display:block; margin-top:0.2rem;">
+        You can add more vehicles after registering.
+      </small>
       <div class="invalid-feedback" id="regVehicleError" style="display:none; color:#dc3545; font-size:0.875rem; margin-top:0.25rem;"></div>
 
       <button type="submit" class="btn btn-primary w-100 auth-btn" data-loading-submit="true" data-loading-text="Creating Account...">
