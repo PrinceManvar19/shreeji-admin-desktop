@@ -339,7 +339,7 @@
           <div id="addVehicleModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:99999; flex-items:center; justify-content:center;">
             <div style="background:white; border-radius:16px; padding:2rem; max-width:450px; width:90%; margin:auto; margin-top: 2rem; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); box-shadow:0 25px 50px rgba(0,0,0,0.2);">
               <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h3 style="margin:0; font-family:'Syne',sans-serif; font-size:1.5rem; font-weight:800; color:#a20405;">Add New Vehicle</h3>
+                <h3 id="dashboardVehicleModalTitle" style="margin:0; font-family:'Syne',sans-serif; font-size:1.5rem; font-weight:800; color:#a20405;">Add New Vehicle</h3>
                 <button type="button" id="closeAddVehicleModal" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#6c757d;">
                   <i class="fas fa-times"></i>
                 </button>
@@ -466,6 +466,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const brandModelInput = document.getElementById('brandModel');
     const addVehicleBtn = document.getElementById('addVehicleBtn');
     const addVehicleModal = document.getElementById('addVehicleModal');
+    const dashboardVehicleModalTitle = document.getElementById('dashboardVehicleModalTitle');
     const closeAddVehicleModalBtn = document.getElementById('closeAddVehicleModal');
     const dashboardSaveVehicle = document.getElementById('dashboardSaveVehicle');
     const dashboardCancelVehicle = document.getElementById('dashboardCancelVehicle');
@@ -473,6 +474,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const dashboardNewBrand = document.getElementById('dashboardNewBrand');
     const dashboardNewModel = document.getElementById('dashboardNewModel');
     const addVehicleMessage = document.getElementById('addVehicleMessage');
+    let editingVehicleId = null;
 
     if (!identifier || !vehicleListContainer) return;
 
@@ -493,29 +495,90 @@ document.addEventListener('DOMContentLoaded', function() {
           vehicleListContainer.style.display = 'block';
           vehicles.forEach(v => {
             const vehicleItem = document.createElement('div');
-            vehicleItem.style.cssText = 'padding-inline:0.75rem; padding-block:0.25rem; background:white; border:1px solid #dee2e6; border-radius:6px; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; gap:0.75rem;';
-            const displayText = v.brand ? `${v.plate_number} (${v.brand}${v.model ? ' ' + v.model : ''})` : v.plate_number;
+            vehicleItem.style.cssText = 'background:white; border:1px solid #dee2e6; border-radius:8px; overflow:hidden;';
+            const plate = v.number_plate || v.plate_number;
+            const brandModel = (v.brand_model || `${v.brand || ''} ${v.model || ''}`).trim();
+            const displayText = brandModel ? `${plate} (${brandModel})` : plate;
             vehicleItem.innerHTML = `
-              <input type="radio" name="vehicleOption" value="${v.plate_number}" data-brand="${v.brand || ''}" data-model="${v.model || ''}" style="cursor:pointer;">
-              <div style="flex:1;">
-                <div style="font-weight:700; color:#1f2937;">${displayText}</div>
+              <label style="display:flex; align-items:center; gap:0.75rem; padding:0.8rem; cursor:pointer; margin:0;">
+                <input type="radio" name="vehicleOption" value="${plate}" data-brand-model="${brandModel}" style="cursor:pointer;">
+                <div style="flex:1; min-width:0;">
+                  <div style="font-weight:800; color:#1f2937;">${displayText}</div>
+                </div>
+              </label>
+              <div style="display:flex; border-top:1px solid #dee2e6;">
+                <button type="button" class="vehicle-edit" style="flex:1; display:flex; align-items:center; justify-content:center; gap:0.4rem; padding:0.65rem; border:0; background:#f8f9fa; color:#1f2937; font-weight:600; font-size:0.85rem; cursor:pointer;">
+                  <i class="fas fa-pen"></i> Edit
+                </button>
+                <div style="width:1px; background:#dee2e6;"></div>
+                <button type="button" class="vehicle-delete" style="flex:1; display:flex; align-items:center; justify-content:center; gap:0.4rem; padding:0.65rem; border:0; background:#fff5f5; color:#dc2626; font-weight:600; font-size:0.85rem; cursor:pointer;">
+                  <i class="fas fa-trash"></i> Remove
+                </button>
               </div>
             `;
 
-            
-            vehicleItem.addEventListener('mouseover', () => {
-              vehicleItem.style.background = '#f0f0f0';
-            });
-            vehicleItem.addEventListener('mouseout', () => {
-              vehicleItem.style.background = 'white';
-            });
-            
             const radio = vehicleItem.querySelector('input[type="radio"]');
             radio.addEventListener('change', function() {
               selectedVehicleInput.value = this.value;
-              const brand = this.dataset.brand || '';
-              const model = this.dataset.model || '';
-              brandModelInput.value = (brand + ' ' + model).trim();
+              brandModelInput.value = this.dataset.brandModel || '';
+            });
+
+            const editButton = vehicleItem.querySelector('.vehicle-edit');
+            const deleteButton = vehicleItem.querySelector('.vehicle-delete');
+            editButton.addEventListener('mouseenter', () => {
+              editButton.style.background = '#e9ecef';
+            });
+            editButton.addEventListener('mouseleave', () => {
+              editButton.style.background = '#f8f9fa';
+            });
+            deleteButton.addEventListener('mouseenter', () => {
+              deleteButton.style.background = '#fee2e2';
+            });
+            deleteButton.addEventListener('mouseleave', () => {
+              deleteButton.style.background = '#fff5f5';
+            });
+            editButton.addEventListener('click', function(event) {
+              event.preventDefault();
+              event.stopPropagation();
+              if (!v.id) {
+                showToast('This vehicle cannot be edited. Please add it again first.', 'error');
+                return;
+              }
+              openVehicleModal(v);
+            });
+            deleteButton.addEventListener('click', async function(event) {
+              event.preventDefault();
+              event.stopPropagation();
+              if (!v.id) {
+                showToast('This vehicle cannot be removed here. Contact support.', 'error');
+                return;
+              }
+              if (!confirm(`Remove ${plate} from your account?`)) return;
+
+              const originalLabel = deleteButton.innerHTML;
+              deleteButton.disabled = true;
+              deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Removing...';
+
+              try {
+                const response = await fetch(`/api/customer/vehicle/${v.id}`, { method: 'DELETE' });
+                const result = await response.json();
+                if (result.success) {
+                  if (selectedVehicleInput.value === plate) {
+                    selectedVehicleInput.value = '';
+                    brandModelInput.value = '';
+                  }
+                  showToast(`${plate} removed successfully.`, 'success');
+                  loadVehicles();
+                } else {
+                  deleteButton.disabled = false;
+                  deleteButton.innerHTML = originalLabel;
+                  showToast(result.message || 'Could not remove vehicle', 'error');
+                }
+              } catch (error) {
+                deleteButton.disabled = false;
+                deleteButton.innerHTML = originalLabel;
+                showToast('Could not remove vehicle. Please try again.', 'error');
+              }
             });
             
             vehicleList.appendChild(vehicleItem);
@@ -527,26 +590,53 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    addVehicleBtn.addEventListener('click', function() {
-      addVehicleModal.style.display = 'flex';
-      dashboardNewPlate.focus();
-      dashboardNewPlate.value = '';
-      dashboardNewBrand.value = '';
-      dashboardNewModel.value = '';
+    function splitBrandModel(value) {
+      const parts = (value || '').trim().split(/\s+/);
+      if (!parts.length || !parts[0]) return ['', ''];
+      return [parts[0], parts.slice(1).join(' ')];
+    }
+
+    function openVehicleModal(vehicle) {
+      editingVehicleId = vehicle && vehicle.id ? vehicle.id : null;
+      const plate = vehicle ? (vehicle.number_plate || vehicle.plate_number || '') : '';
+      const brandModel = vehicle ? (vehicle.brand_model || `${vehicle.brand || ''} ${vehicle.model || ''}`).trim() : '';
+      const [brand, model] = splitBrandModel(brandModel);
+
+      dashboardVehicleModalTitle.textContent = editingVehicleId ? 'Edit Vehicle' : 'Add New Vehicle';
+      dashboardNewPlate.value = plate;
+      dashboardNewBrand.value = brand;
+      dashboardNewModel.value = model;
+      dashboardNewPlate.readOnly = Boolean(editingVehicleId);
+      dashboardNewPlate.style.background = editingVehicleId ? '#f3f4f6' : '';
+      dashboardNewPlate.title = editingVehicleId ? 'Number plate cannot be changed. Remove and re-add to change it.' : '';
       addVehicleMessage.style.display = 'none';
+      addVehicleModal.style.display = 'flex';
+
+      if (editingVehicleId) {
+        dashboardNewBrand.focus();
+      } else {
+        dashboardNewPlate.focus();
+      }
+    }
+
+    addVehicleBtn.addEventListener('click', function() {
+      openVehicleModal(null);
     });
 
     closeAddVehicleModalBtn.addEventListener('click', function() {
       addVehicleModal.style.display = 'none';
+      editingVehicleId = null;
     });
 
     dashboardCancelVehicle.addEventListener('click', function() {
       addVehicleModal.style.display = 'none';
+      editingVehicleId = null;
     });
 
     addVehicleModal.addEventListener('click', function(e) {
       if (e.target === addVehicleModal) {
         addVehicleModal.style.display = 'none';
+        editingVehicleId = null;
       }
     });
 
@@ -568,22 +658,31 @@ document.addEventListener('DOMContentLoaded', function() {
       setLoading(dashboardSaveVehicle, true);
 
       try {
-        const response = await fetch('/api/vehicles/add', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ plate_number: plate, brand, model })
-        });
+        const brandModel = (brand + (model ? ' ' + model : '')).trim();
+        const response = editingVehicleId
+          ? await fetch(`/api/customer/vehicle/${editingVehicleId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ number_plate: plate, brand_model: brandModel })
+            })
+          : await fetch('/api/vehicles/add', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ plate_number: plate, brand, model })
+            });
         const result = await response.json();
 
         if (result.success) {
-          showToast('Vehicle added successfully!', 'success');
+          showToast(editingVehicleId ? 'Vehicle updated successfully!' : 'Vehicle added successfully!', 'success');
           addVehicleModal.style.display = 'none';
+          const savedPlate = plate;
+          editingVehicleId = null;
           setTimeout(() => {
             loadVehicles();
             setTimeout(() => {
               const radios = vehicleList.querySelectorAll('input[type="radio"]');
               radios.forEach(radio => {
-                if (radio.value === plate) {
+                if (radio.value === savedPlate) {
                   radio.checked = true;
                   radio.dispatchEvent(new Event('change'));
                 }
