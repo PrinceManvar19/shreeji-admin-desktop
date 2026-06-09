@@ -7,12 +7,36 @@ from pathlib import Path
 from flask import current_app, g
 
 
+def clean_database_url(database_url):
+    cleaned = (database_url or "").strip()
+    if (
+        len(cleaned) >= 2
+        and cleaned[0] == cleaned[-1]
+        and cleaned[0] in ("'", '"')
+    ):
+        cleaned = cleaned[1:-1].strip()
+    if cleaned.startswith("DATABASE_URL="):
+        cleaned = cleaned.replace("DATABASE_URL=", "", 1).strip()
+    if (
+        len(cleaned) >= 2
+        and cleaned[0] == cleaned[-1]
+        and cleaned[0] in ("'", '"')
+    ):
+        cleaned = cleaned[1:-1].strip()
+    return cleaned
+
+
 def get_db():
     if "db" not in g:
-        database_url = current_app.config.get("DATABASE_URL") or os.getenv("DATABASE_URL")
+        database_url = clean_database_url(
+            current_app.config.get("DATABASE_URL") or os.getenv("DATABASE_URL")
+        )
 
         if not database_url:
-            raise ValueError("DATABASE_URL environment variable not set")
+            raise ValueError(
+                "DATABASE_URL environment variable not set. Add it to Railway "
+                "Variables for the web service."
+            )
 
         connection = psycopg2.connect(database_url)
         g.db = connection

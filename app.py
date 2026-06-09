@@ -1,78 +1,141 @@
-from dotenv import load_dotenv
-load_dotenv()
-
 import os
 
+from dotenv import load_dotenv
 from flask import Flask, jsonify
 
 from models.db import init_app as init_db_app
+from routes.admin_attendance_routes import att_bp
 from routes.admin_routes import admin_bp
 from routes.admin_salary_routes import salary_bp
-from routes.admin_attendance_routes import att_bp
 from routes.auth_routes import auth_bp
 from routes.customer_routes import customer_bp
 from routes.main_routes import main_bp
 from services.auth_service import ensure_session_user
-from utils.helpers import log_action
+
+
+def is_railway_environment():
+    return any(
+        os.environ.get(name)
+        for name in (
+            "RAILWAY_ENVIRONMENT",
+            "RAILWAY_ENVIRONMENT_NAME",
+            "RAILWAY_PROJECT_ID",
+            "RAILWAY_SERVICE_ID",
+            "RAILWAY_STATIC_URL",
+        )
+    )
+
+
+def load_environment():
+    environment = "RAILWAY" if is_railway_environment() else "LOCAL"
+    if environment == "LOCAL":
+        load_dotenv(override=False)
+    return environment
+
+
+def clean_database_url(database_url):
+    cleaned = (database_url or "").strip()
+    if (
+        len(cleaned) >= 2
+        and cleaned[0] == cleaned[-1]
+        and cleaned[0] in ("'", '"')
+    ):
+        cleaned = cleaned[1:-1].strip()
+
+    if cleaned.startswith("DATABASE_URL="):
+        cleaned = cleaned.replace("DATABASE_URL=", "", 1).strip()
+
+    if (
+        len(cleaned) >= 2
+        and cleaned[0] == cleaned[-1]
+        and cleaned[0] in ("'", '"')
+    ):
+        cleaned = cleaned[1:-1].strip()
+
+    return cleaned
+
+
+def database_url_error(database_url):
+    if not database_url:
+        return (
+            "DATABASE_URL is missing. Add it to Railway Variables for the "
+            "same service that runs gunicorn."
+        )
+    if not database_url.startswith(("postgresql://", "postgres://")):
+        return (
+            "DATABASE_URL must start with postgresql:// or postgres://. "
+            "Do not include quotes or a DATABASE_URL= prefix in Railway."
+        )
+    return ""
+
+
+def print_startup_diagnostics(environment, database_url):
+    print("--------------------------------------------------", flush=True)
+    print(f"Environment: {environment}", flush=True)
+    print(f"DATABASE_URL Found: {'YES' if database_url else 'NO'}", flush=True)
+    print(f"DATABASE_URL Length: {len(database_url or '')}", flush=True)
+    print("--------------------------------------------------", flush=True)
+
+
+def register_configuration_error_routes(app, message):
+    @app.route("/", defaults={"path": ""})
+    @app.route("/<path:path>")
+    def configuration_error(path):
+        if path == "health":
+            return jsonify({
+                "status": "configuration_error",
+                "message": message,
+            }), 503
+
+        return (
+            "<h1>Garage Management configuration error</h1>"
+            f"<p>{message}</p>"
+            "<p>Set Railway Variables -> DATABASE_URL to the raw Neon "
+            "PostgreSQL URL, then redeploy.</p>",
+            503,
+        )
 
 
 def create_app():
+    environment = load_environment()
+    database_url = clean_database_url(os.environ.get("DATABASE_URL"))
+    print_startup_diagnostics(environment, database_url)
+
     app = Flask(__name__)
 
-    # =========================
-    # Secret Key
-    # =========================
     app.secret_key = os.environ.get(
         "SECRET_KEY",
-        "shreeji-auto-key-2025"
+        "shreeji-auto-key-2025",
     )
 
-    # =========================
-    # PostgreSQL DATABASE URL
-    # =========================
-    database_url = os.environ.get("DATABASE_URL")
+    app.config["UPLOAD_FOLDER"] = "static/uploads"
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
-    if not database_url:
-        raise ValueError(
-            "DATABASE_URL environment variable is required for PostgreSQL connection"
-        )
-
-    # IMPORTANT FIX:
-    # Remove accidental DATABASE_URL= prefix if present
-    if database_url.startswith("DATABASE_URL="):
-        database_url = database_url.replace(
-            "DATABASE_URL=",
-            "",
-            1
-        )
+    config_error = database_url_error(database_url)
+    if config_error:
+        print(f"STARTUP CONFIGURATION ERROR: {config_error}", flush=True)
+        app.config["STARTUP_CONFIG_ERROR"] = config_error
+        register_configuration_error_routes(app, config_error)
+        return app
 
     app.config["DATABASE_URL"] = database_url
 
-    # =========================
-    # Upload Folder
-    # =========================
-    app.config["UPLOAD_FOLDER"] = "static/uploads"
+    try:
+        init_db_app(app)
+    except Exception as error:
+        message = (
+            "Database initialization failed. Verify DATABASE_URL points to a "
+            f"reachable PostgreSQL database. Error: {error}"
+        )
+        print(f"STARTUP CONFIGURATION ERROR: {message}", flush=True)
+        app.config["STARTUP_CONFIG_ERROR"] = message
+        register_configuration_error_routes(app, message)
+        return app
 
-    os.makedirs(
-        app.config["UPLOAD_FOLDER"],
-        exist_ok=True
-    )
-
-    # =========================
-    # Initialize Database
-    # =========================
-    init_db_app(app)
-
-    # =========================
-    # Session Sync
-    # =========================
     @app.before_request
     def sync_session_user():
         ensure_session_user()
 
-    # =========================
-    # Register Blueprints
-    # =========================
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(customer_bp)
@@ -80,14 +143,13 @@ def create_app():
     app.register_blueprint(salary_bp)
     app.register_blueprint(att_bp)
 
-    # =========================
-    # Health Check Route
-    # =========================
     @app.route("/health")
     def health_check():
         return jsonify({
             "status": "ok",
-            "message": "Garage Management System Running"
+            "environment": environment,
+            "database_url_found": True,
+            "message": "Garage Management System Running",
         })
 
     return app
@@ -98,9 +160,8 @@ app = create_app()
 
 if __name__ == "__main__":
     app.config["TEMPLATES_AUTO_RELOAD"] = True
-
     app.run(
         host="0.0.0.0",
-        port=5000,
-        debug=True
+        port=int(os.environ.get("PORT", 5000)),
+        debug=not is_railway_environment(),
     )
