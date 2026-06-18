@@ -1,4 +1,4 @@
-from models.db import query_dict_one
+from db_neon import query_dict_one
 
 
 def get_admin_by_id(admin_id):

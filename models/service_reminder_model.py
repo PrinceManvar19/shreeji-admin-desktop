@@ -1,9 +1,6 @@
 from datetime import date, datetime, timedelta
 
-import psycopg2
-from psycopg2.extras import RealDictCursor
-
-from models.db import get_db, query_dict, query_dict_one
+from db_neon import get_neon_db as get_db, query_dict, query_dict_one, execute_query
 
 
 REMINDER_MESSAGE = (
@@ -90,43 +87,35 @@ def build_service_reminder_message(reminder):
 
 
 def mark_service_reminder_sent(booking_id):
-    db = get_db()
-    cursor = db.cursor(cursor_factory=RealDictCursor)
-    try:
-        cursor.execute("""
-            UPDATE bookings
-            SET service_reminder_sent = 1,
-                reminder_sent_at = %s,
-                reminder_snooze_until = NULL
-            WHERE booking_id = %s
-            RETURNING booking_id
-        """, (datetime.now().strftime("%Y-%m-%d %H:%M"), booking_id))
-        updated = cursor.fetchone()
-        db.commit()
-        return bool(updated)
-    except psycopg2.Error:
-        db.rollback()
-        raise
-    finally:
-        cursor.close()
+    existing = query_dict_one(
+        "SELECT booking_id FROM bookings WHERE booking_id = %s",
+        (booking_id,),
+    )
+    if not existing:
+        return False
+
+    execute_query("""
+        UPDATE bookings
+        SET service_reminder_sent = 1,
+            reminder_sent_at = %s,
+            reminder_snooze_until = NULL
+        WHERE booking_id = %s
+    """, (datetime.now().strftime("%Y-%m-%d %H:%M"), booking_id))
+    return True
 
 
 def snooze_service_reminder(booking_id, days=7):
     snooze_until = (date.today() + timedelta(days=days)).isoformat()
-    db = get_db()
-    cursor = db.cursor(cursor_factory=RealDictCursor)
-    try:
-        cursor.execute("""
-            UPDATE bookings
-            SET reminder_snooze_until = %s
-            WHERE booking_id = %s
-            RETURNING booking_id
-        """, (snooze_until, booking_id))
-        updated = cursor.fetchone()
-        db.commit()
-        return bool(updated), snooze_until
-    except psycopg2.Error:
-        db.rollback()
-        raise
-    finally:
-        cursor.close()
+    existing = query_dict_one(
+        "SELECT booking_id FROM bookings WHERE booking_id = %s",
+        (booking_id,),
+    )
+    if not existing:
+        return False, snooze_until
+
+    execute_query("""
+        UPDATE bookings
+        SET reminder_snooze_until = %s
+        WHERE booking_id = %s
+    """, (snooze_until, booking_id))
+    return True, snooze_until

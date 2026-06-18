@@ -3,7 +3,8 @@ import os
 from dotenv import load_dotenv
 from flask import Flask, jsonify
 
-from models.db import init_app as init_db_app
+from db_neon import init_app as init_db_app
+from db_local import init_local_db
 from routes.admin_attendance_routes import att_bp
 from routes.admin_routes import admin_bp
 from routes.admin_salary_routes import salary_bp
@@ -74,6 +75,7 @@ def print_startup_diagnostics(environment, database_url):
     print(f"Environment: {environment}", flush=True)
     print(f"DATABASE_URL Found: {'YES' if database_url else 'NO'}", flush=True)
     print(f"DATABASE_URL Length: {len(database_url or '')}", flush=True)
+    print(f"Local SQLite path: {os.path.join('data', 'garage.db')}", flush=True)
     print("--------------------------------------------------", flush=True)
 
 
@@ -110,6 +112,12 @@ def create_app():
 
     app.config["UPLOAD_FOLDER"] = "static/uploads"
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+
+    try:
+        init_local_db()
+        print("Local SQLite database initialised.", flush=True)
+    except Exception as error:
+        print(f"WARNING: Local SQLite init failed: {error}", flush=True)
 
     config_error = database_url_error(database_url)
     if config_error:
@@ -149,6 +157,7 @@ def create_app():
             "status": "ok",
             "environment": environment,
             "database_url_found": True,
+            "local_db": "initialised",
             "message": "Garage Management System Running",
         })
 

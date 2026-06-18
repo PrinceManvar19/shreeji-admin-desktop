@@ -1,4 +1,4 @@
-from models.db import get_db, query_dict, query_dict_one, execute_query
+from db_neon import get_neon_db as get_db, query_dict, query_dict_one, execute_query
 from utils.constants import ACTIVE_SLOT_STATUSES, STATUS_CHECKED_IN
 
 

@@ -1,8 +1,21 @@
 """Attendance model for worker daily attendance records."""
 
 import datetime
-from models.db import get_db, query_dict, query_dict_one, execute_query
+
+from db_local import get_local_db as get_db
 from utils.helpers import log_action
+
+
+def _qdict(sql, params=()):
+    conn = get_db(); rows = conn.execute(sql, params).fetchall(); conn.close(); return [dict(r) for r in rows]
+
+
+def _qone(sql, params=()):
+    conn = get_db(); row = conn.execute(sql, params).fetchone(); conn.close(); return dict(row) if row else None
+
+
+def _exec(sql, params=()):
+    conn = get_db(); conn.execute(sql, params); conn.commit(); conn.close()
 
 
 VALID_STATUSES = {"present", "absent", "half_day", "leave", "holiday"}
@@ -16,59 +29,12 @@ STATUS_WEIGHTS = {
 }
 
 
-def ensure_attendance_table():
-    """Create attendance_records table if it doesn't exist (PostgreSQL)."""
-    db = get_db()
-    cursor = db.cursor()
-    try:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS attendance_records (
-                id SERIAL PRIMARY KEY,
-                worker_id TEXT NOT NULL,
-                attendance_date TEXT NOT NULL,
-                attendance_status TEXT NOT NULL DEFAULT 'present',
-                check_in TEXT DEFAULT '',
-                check_out TEXT DEFAULT '',
-                status TEXT NOT NULL DEFAULT 'present',
-                notes TEXT DEFAULT '',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (worker_id) REFERENCES workers(id),
-                UNIQUE(worker_id, attendance_date)
-            )
-        """)
-        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_att_unique ON attendance_records(worker_id, attendance_date)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_att_date ON attendance_records(attendance_date)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_att_worker ON attendance_records(worker_id)")
-        db.commit()
-
-        # Add any missing columns safely
-        required = {
-            "attendance_status": "TEXT NOT NULL DEFAULT 'present'",
-            "check_in": "TEXT DEFAULT ''",
-            "check_out": "TEXT DEFAULT ''",
-            "status": "TEXT NOT NULL DEFAULT 'present'",
-        }
-        cursor.execute("""
-            SELECT column_name FROM information_schema.columns
-            WHERE table_name = 'attendance_records'
-        """)
-        existing_cols = {row[0] for row in cursor.fetchall()}
-        for col, ddl in required.items():
-            if col not in existing_cols:
-                cursor.execute(f"ALTER TABLE attendance_records ADD COLUMN {col} {ddl}")
-        db.commit()
-    finally:
-        cursor.close()
-
-
 def _normalize_status(status, default="present"):
     status = (status or default).strip().lower()
     return status if status in VALID_STATUSES else default
 
 
 def upsert_attendance(worker_id, attendance_date, status, notes=""):
-    ensure_attendance_table()
     worker_id = worker_id.strip().upper()
     status = _normalize_status(status)
     notes = (notes or "").strip()
@@ -79,13 +45,12 @@ def upsert_attendance(worker_id, attendance_date, status, notes=""):
         return False, f"Worker {worker_id} not found"
 
     try:
-        execute_query("""
-            INSERT INTO attendance_records (worker_id, attendance_date, status, notes)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (worker_id, attendance_date) DO UPDATE SET
-                status = EXCLUDED.status,
-                notes = EXCLUDED.notes,
-                updated_at = CURRENT_TIMESTAMP
+        _exec("""
+            INSERT INTO attendance_records (worker_id, date, status, notes)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (worker_id, date) DO UPDATE SET
+                status = excluded.status,
+                notes = excluded.notes
         """, (worker_id, attendance_date, status, notes))
         log_action("ATTENDANCE_SAVED", f"{worker_id} {attendance_date} {status}")
         return True, "Attendance saved"
@@ -95,45 +60,42 @@ def upsert_attendance(worker_id, attendance_date, status, notes=""):
 
 
 def get_attendance_for_date(attendance_date):
-    ensure_attendance_table()
-    rows = query_dict("""
-        SELECT ar.*, w.name, w.phone
+    rows = _qdict("""
+        SELECT ar.*, ar.date AS attendance_date, w.name, w.phone
         FROM attendance_records ar
         JOIN workers w ON ar.worker_id = w.id
-        WHERE ar.attendance_date = %s
+        WHERE ar.date = ?
         ORDER BY w.name ASC
     """, (attendance_date,))
     return [dict(row) for row in rows]
 
 
 def get_attendance_for_worker(worker_id, year=None, month=None):
-    ensure_attendance_table()
     worker_id = worker_id.strip().upper()
-    query = "SELECT * FROM attendance_records WHERE worker_id = %s"
+    query = "SELECT *, date AS attendance_date FROM attendance_records WHERE worker_id = ?"
     params = [worker_id]
 
     if year:
-        query += " AND TO_CHAR(attendance_date::date, 'YYYY') = %s"
+        query += " AND substr(date, 1, 4) = ?"
         params.append(str(year))
     if month:
-        query += " AND TO_CHAR(attendance_date::date, 'MM') = %s"
+        query += " AND substr(date, 6, 2) = ?"
         params.append(f"{int(month):02d}")
 
-    query += " ORDER BY attendance_date ASC"
-    rows = query_dict(query, params)
+    query += " ORDER BY date ASC"
+    rows = _qdict(query, params)
     return [dict(row) for row in rows]
 
 
 def calculate_month_attendance(worker_id, year, month):
-    ensure_attendance_table()
     worker_id = worker_id.strip().upper()
     month_str = f"{int(month):02d}"
     date_prefix = f"{year}-{month_str}"
 
-    rows = query_dict("""
+    rows = _qdict("""
         SELECT status FROM attendance_records
-        WHERE worker_id = %s AND attendance_date LIKE %s
-        ORDER BY attendance_date ASC
+        WHERE worker_id = ? AND date LIKE ?
+        ORDER BY date ASC
     """, (worker_id, date_prefix + "%"))
 
     total_records = len(rows)
@@ -157,12 +119,11 @@ def calculate_month_attendance(worker_id, year, month):
 
 
 def get_today_summary():
-    ensure_attendance_table()
     today = datetime.date.today().isoformat()
-    rows = query_dict("""
+    rows = _qdict("""
         SELECT status, COUNT(*) as cnt
         FROM attendance_records
-        WHERE attendance_date = %s
+        WHERE date = ?
         GROUP BY status
     """, (today,))
 
@@ -170,13 +131,12 @@ def get_today_summary():
     status_counts = {row["status"]: row["cnt"] for row in rows}
     summary.update(status_counts)
 
-    total_row = query_dict_one("SELECT COUNT(*) as cnt FROM workers WHERE worker_status = 'active'")
+    total_row = _qone("SELECT COUNT(*) as cnt FROM workers WHERE worker_status = 'active'")
     summary["total_workers"] = total_row["cnt"] if total_row else 0
     return summary
 
 
 def bulk_save_attendance(records):
-    ensure_attendance_table()
     ok, err = 0, 0
     for rec in records:
         ok_rec, _ = upsert_attendance(
@@ -193,30 +153,29 @@ def bulk_save_attendance(records):
 
 
 def get_attendance_history(worker_id=None, year=None, month=None, date_from=None, date_to=None):
-    ensure_attendance_table()
     query = """
-        SELECT ar.*, w.name, w.phone
+        SELECT ar.*, ar.date AS attendance_date, w.name, w.phone
         FROM attendance_records ar
         JOIN workers w ON ar.worker_id = w.id
         WHERE 1=1
     """
     params = []
     if worker_id:
-        query += " AND ar.worker_id = %s"
+        query += " AND ar.worker_id = ?"
         params.append(worker_id.strip().upper())
     if year:
-        query += " AND TO_CHAR(ar.attendance_date::date, 'YYYY') = %s"
+        query += " AND substr(ar.date, 1, 4) = ?"
         params.append(str(year))
     if month:
-        query += " AND TO_CHAR(ar.attendance_date::date, 'MM') = %s"
+        query += " AND substr(ar.date, 6, 2) = ?"
         params.append(f"{int(month):02d}")
     if date_from:
-        query += " AND ar.attendance_date >= %s"
+        query += " AND ar.date >= ?"
         params.append(date_from)
     if date_to:
-        query += " AND ar.attendance_date <= %s"
+        query += " AND ar.date <= ?"
         params.append(date_to)
 
-    query += " ORDER BY ar.attendance_date DESC"
-    rows = query_dict(query, params)
+    query += " ORDER BY ar.date DESC"
+    rows = _qdict(query, params)
     return [dict(row) for row in rows]

@@ -3,7 +3,7 @@
 import json
 from datetime import datetime
 
-from models.db import get_db, query_dict, query_dict_one, execute_query
+from db_neon import get_neon_db as get_db, query_dict, query_dict_one, execute_query
 
 
 AUDIT_LOG_COLUMNS = """

@@ -1,4 +1,4 @@
-from models.db import query_dict, query_dict_one, execute_query
+from db_neon import query_dict, query_dict_one, execute_query
 
 
 def get_slots_map():

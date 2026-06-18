@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 
-from models.db import get_db, query_dict, query_dict_one, execute_query
+from db_neon import get_neon_db as get_db, query_dict, query_dict_one, execute_query
 from utils.helpers import (
     is_valid_indian_number_plate,
     log_action,

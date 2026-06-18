@@ -1,56 +1,21 @@
-from models.db import get_db, query_dict, query_dict_one, execute_query
+from db_local import get_local_db as get_db
 from utils.helpers import normalize_phone, log_action
 
 
-SCHEMA_LOCK_KEY = 4194304
+def _qdict(sql, params=()):
+    conn = get_db(); rows = conn.execute(sql, params).fetchall(); conn.close(); return [dict(r) for r in rows]
 
 
-def _ensure_worker_status_column():
-    db = get_db()
-    cursor = db.cursor()
-
-    try:
-        cursor.execute("SELECT pg_try_advisory_lock(%s)", (SCHEMA_LOCK_KEY,))
-        locked = cursor.fetchone()[0]
-        if not locked:
-            cursor.execute("SELECT pg_advisory_lock(%s)", (SCHEMA_LOCK_KEY,))
-
-        cursor.execute("""
-            SELECT column_name FROM information_schema.columns
-            WHERE table_name = 'workers' AND column_name = 'worker_status'
-        """)
-        if cursor.fetchone():
-            return
-
-        cursor.execute("""
-            ALTER TABLE workers
-            ADD COLUMN IF NOT EXISTS worker_status TEXT DEFAULT 'active'
-        """)
-        cursor.execute("""
-            UPDATE workers
-            SET worker_status = 'active'
-            WHERE worker_status IS NULL OR TRIM(worker_status) = ''
-        """)
-        db.commit()
-
-    except Exception:
-        db.rollback()
-        raise
-
-    finally:
-        try:
-            cursor.execute("SELECT pg_advisory_unlock(%s)", (SCHEMA_LOCK_KEY,))
-        except Exception:
-            pass
-        cursor.close()
+def _qone(sql, params=()):
+    conn = get_db(); row = conn.execute(sql, params).fetchone(); conn.close(); return dict(row) if row else None
 
 
-def ensure_worker_status_column():
-    _ensure_worker_status_column()
+def _exec(sql, params=()):
+    conn = get_db(); conn.execute(sql, params); conn.commit(); conn.close()
 
 
 def generate_next_worker_id():
-    rows = query_dict("SELECT id FROM workers WHERE id LIKE %s", ("WORK%",))
+    rows = _qdict("SELECT id FROM workers WHERE id LIKE ?", ("WORK%",))
     used_numbers = set()
     for row in rows:
         suffix = str(row["id"] or "")[4:]
@@ -63,24 +28,21 @@ def generate_next_worker_id():
 
 
 def get_all_workers():
-    ensure_worker_status_column()
-    rows = query_dict(
+    rows = _qdict(
         "SELECT id, name, phone, monthly_salary, worker_status FROM workers ORDER BY id ASC"
     )
     return [dict(row) for row in rows]
 
 
 def get_worker(worker_id):
-    ensure_worker_status_column()
-    row = query_dict_one(
-        "SELECT id, name, phone, monthly_salary, worker_status FROM workers WHERE id = %s",
+    row = _qone(
+        "SELECT id, name, phone, monthly_salary, worker_status FROM workers WHERE id = ?",
         (worker_id,),
     )
     return dict(row) if row else None
 
 
 def create_worker(worker_id, name, phone, monthly_salary, worker_status="active"):
-    ensure_worker_status_column()
     worker_id = (worker_id or "").strip().upper()
     name = (name or "").strip()
     norm_phone = normalize_phone(phone)
@@ -97,7 +59,7 @@ def create_worker(worker_id, name, phone, monthly_salary, worker_status="active"
     if worker_status not in {"active", "inactive"}:
         worker_status = "active"
 
-    existing = query_dict_one("SELECT id FROM workers WHERE phone = %s", (norm_phone,))
+    existing = _qone("SELECT id FROM workers WHERE phone = ?", (norm_phone,))
     if existing:
         return False, "Phone number already registered", None
 
@@ -106,7 +68,7 @@ def create_worker(worker_id, name, phone, monthly_salary, worker_status="active"
     try:
         cursor = db.cursor()
         cursor.execute(
-            "INSERT INTO workers (id, name, phone, monthly_salary, worker_status) VALUES (%s, %s, %s, %s, %s)",
+            "INSERT INTO workers (id, name, phone, monthly_salary, worker_status) VALUES (?, ?, ?, ?, ?)",
             (worker_id, name, norm_phone, monthly_salary, worker_status),
         )
         db.commit()
@@ -121,10 +83,10 @@ def create_worker(worker_id, name, phone, monthly_salary, worker_status="active"
     finally:
         if cursor is not None:
             cursor.close()
+        db.close()
 
 
 def update_worker(worker_id, name, phone, monthly_salary, worker_status="active"):
-    ensure_worker_status_column()
     worker_id = (worker_id or "").strip().upper()
     name = (name or "").strip()
     norm_phone = normalize_phone(phone)
@@ -145,8 +107,8 @@ def update_worker(worker_id, name, phone, monthly_salary, worker_status="active"
     if not existing:
         return False, "Worker not found"
 
-    phone_conflict = query_dict_one(
-        "SELECT id FROM workers WHERE phone = %s AND id != %s",
+    phone_conflict = _qone(
+        "SELECT id FROM workers WHERE phone = ? AND id != ?",
         (norm_phone, worker_id),
     )
     if phone_conflict:
@@ -159,8 +121,8 @@ def update_worker(worker_id, name, phone, monthly_salary, worker_status="active"
         cursor.execute(
             """
             UPDATE workers
-            SET name = %s, phone = %s, monthly_salary = %s, worker_status = %s
-            WHERE id = %s
+            SET name = ?, phone = ?, monthly_salary = ?, worker_status = ?
+            WHERE id = ?
             """,
             (name, norm_phone, monthly_salary, worker_status, worker_id),
         )
@@ -173,6 +135,7 @@ def update_worker(worker_id, name, phone, monthly_salary, worker_status="active"
     finally:
         if cursor is not None:
             cursor.close()
+        db.close()
 
 
 def delete_worker(worker_id):
@@ -186,7 +149,7 @@ def delete_worker(worker_id):
     cursor = None
     try:
         cursor = db.cursor()
-        cursor.execute("DELETE FROM workers WHERE id = %s", (worker_id,))
+        cursor.execute("DELETE FROM workers WHERE id = ?", (worker_id,))
         db.commit()
         return True, ""
     except Exception as e:
@@ -196,3 +159,4 @@ def delete_worker(worker_id):
     finally:
         if cursor is not None:
             cursor.close()
+        db.close()

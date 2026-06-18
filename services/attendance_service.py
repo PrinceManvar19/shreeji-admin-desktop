@@ -6,7 +6,6 @@ import calendar
 from models.attendance_model import (
     calculate_month_attendance,
     get_attendance_for_worker,
-    ensure_attendance_table,
 )
 from models.worker_model import get_all_workers
 
@@ -17,7 +16,6 @@ def get_attendance_summary_for_period(worker_id, year, month):
     Includes auto-computed attended_days and total_days from attendance records,
     plus a breakdown of each status type.
     """
-    ensure_attendance_table()
     month_int = int(month)
     year_int = int(year)
     total_days = calendar.monthrange(year_int, month_int)[1]

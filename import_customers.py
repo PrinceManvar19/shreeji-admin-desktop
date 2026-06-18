@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 from app import app
-from models.db import get_db
+from db_neon import get_neon_db as get_db
 from psycopg2.extras import execute_values
 from utils.helpers import normalize_number_plate, normalize_phone
 

@@ -5,9 +5,8 @@ from io import BytesIO, StringIO
 from urllib.parse import quote
 
 from flask import Blueprint, jsonify, Response, flash, redirect, render_template, request, session, url_for
-from psycopg2.extras import RealDictCursor
 
-from models.db import get_db
+from db_neon import get_neon_db as get_db, query_dict, query_dict_one
 from models.booking_model import update_message_flags
 from services.booking_service import (
     approve_booking as approve_booking_service,
@@ -670,13 +669,11 @@ def export_preview():
     if data_type == "bookings":
         count = _count_booking_exports(from_date, to_date, status)
     elif data_type == "customers":
-        from models.db import query_dict_one
         row = query_dict_one("SELECT COUNT(*) AS total FROM customers")
         count = row["total"] if row else 0
     elif data_type == "garage":
         count = _count_booking_exports(from_date, to_date, garage_only=True)
     elif data_type == "all":
-        from models.db import query_dict_one
         customer_row = query_dict_one("SELECT COUNT(*) AS total FROM customers")
         count = _count_booking_exports(from_date, to_date, status)
         count += customer_row["total"] if customer_row else 0
@@ -822,36 +819,20 @@ def _booking_filter_clause(from_date="", to_date="", status="", garage_only=Fals
 
 def _fetch_booking_export_rows(from_date="", to_date="", status="", garage_only=False):
     where_sql, params = _booking_filter_clause(from_date, to_date, status, garage_only)
-    db = get_db()
-    cursor = db.cursor(cursor_factory=RealDictCursor)
-
-    try:
-        cursor.execute(
-            f"""
-            SELECT booking_id, customer_id, name, phone, vehicle, brand_model, service,
-                   date, status, created_at, checked_in_at, completed_at
-            FROM bookings
-            {where_sql}
-            ORDER BY date DESC, COALESCE(created_at, checked_in_at, '') DESC
-            """,
-            params,
-        )
-        return cursor.fetchall()
-
-    finally:
-        cursor.close()
+    return query_dict(
+        f"""
+        SELECT booking_id, customer_id, name, phone, vehicle, brand_model, service,
+               date, status, created_at, checked_in_at, completed_at
+        FROM bookings
+        {where_sql}
+        ORDER BY date DESC, COALESCE(created_at, checked_in_at, '') DESC
+        """,
+        params,
+    )
 
 
 def _fetch_customer_export_rows():
-    db = get_db()
-    cursor = db.cursor(cursor_factory=RealDictCursor)
-
-    try:
-        cursor.execute("SELECT id, name, phone, vehicle FROM customers ORDER BY id ASC")
-        return cursor.fetchall()
-
-    finally:
-        cursor.close()
+    return query_dict("SELECT id, name, phone, vehicle FROM customers ORDER BY id ASC")
 
 
 def _booking_csv_rows(rows):
@@ -912,7 +893,6 @@ def _csv_string(headers, rows):
 
 def _count_booking_exports(from_date="", to_date="", status="", garage_only=False):
     where_sql, params = _booking_filter_clause(from_date, to_date, status, garage_only)
-    from models.db import query_dict_one
     row = query_dict_one(f"SELECT COUNT(*) AS total FROM bookings {where_sql}", params)
     return row["total"] if row else 0
 

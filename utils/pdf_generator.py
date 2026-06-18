@@ -23,9 +23,8 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-from models.db import get_db
+from db_local import get_local_db
 from models.worker_model import get_worker
-from psycopg2.extras import RealDictCursor
 
 
 COMPANY_NAME = "SHREEJI AUTO SERVICE"
@@ -340,16 +339,10 @@ def generate_salary_pdf(record_id):
     _register_fonts()
     buffer = BytesIO()
 
-    db = get_db()
-    cursor = db.cursor(cursor_factory=RealDictCursor)
-
-    try:
-        cursor.execute("SELECT * FROM salary_records WHERE id = %s", (record_id,))
-        record = cursor.fetchone()
-
-    finally:
-        cursor.close()
-
+    conn = get_local_db()
+    row = conn.execute("SELECT * FROM salary_records WHERE id = ?", (record_id,)).fetchone()
+    conn.close()
+    record = dict(row) if row else None
 
     if not record:
         doc = SimpleDocTemplate(buffer, pagesize=A4)
@@ -358,7 +351,6 @@ def generate_salary_pdf(record_id):
         buffer.seek(0)
         return buffer
 
-    record = dict(record)
     worker = get_worker(record["worker_id"]) or {"name": "Unknown", "phone": "", "monthly_salary": 0}
     month_text = _month_label(record.get("month"), record.get("year"))
     generated_at = datetime.now().strftime("%d-%b-%Y %I:%M %p")

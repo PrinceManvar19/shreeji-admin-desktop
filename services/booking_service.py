@@ -1,8 +1,7 @@
 import re
 from datetime import datetime, timedelta
-import psycopg2
-from psycopg2.extras import RealDictCursor
 
+from db_neon import get_neon_db as get_db, query_dict_one
 from models.audit_log_model import log_audit_action
 from models.booking_model import (
     booking_id_exists,
@@ -16,7 +15,6 @@ from models.booking_model import (
     update_booking_status,
 )
 from models.customer_model import get_customer_by_id, get_customer_map
-from models.db import get_db
 from services.slot_service import get_slot_availability
 from utils.constants import (
     STATUS_APPROVED,
@@ -235,25 +233,16 @@ def create_booking_for_customer(
             None,
         )
 
-    # CHECK EXISTING CUSTOMER BOOKING
-    db = get_db()
-    cursor = db.cursor(cursor_factory=RealDictCursor)
-
-    try:
-        cursor.execute(
-            """
-            SELECT COUNT(*) AS count
-            FROM bookings
-            WHERE customer_id = %s
-            AND date = %s
-            AND status NOT IN ('rejected', 'completed')
-            """,
-            (normalized_customer_id, normalized_date),
-        )
-        existing = cursor.fetchone()
-
-    finally:
-        cursor.close()
+    existing = query_dict_one(
+        """
+        SELECT COUNT(*) AS count
+        FROM bookings
+        WHERE customer_id = %s
+        AND date = %s
+        AND status NOT IN ('rejected', 'completed')
+        """,
+        (normalized_customer_id, normalized_date),
+    )
 
     if existing and existing["count"] > 0:
         return False, "You already have a booking on this date.", None

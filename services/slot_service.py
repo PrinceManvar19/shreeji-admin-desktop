@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from models.db import get_db
+from db_neon import get_neon_db as get_db
 from models.booking_model import count_bookings_for_slot
 from models.slot_model import get_slot, get_slots_map, update_slot_total
 from utils.helpers import get_next_days

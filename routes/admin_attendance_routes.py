@@ -8,7 +8,6 @@ from flask import Blueprint, flash, redirect, render_template, request, session,
 
 from models.worker_model import get_all_workers, get_worker
 from models.attendance_model import (
-    ensure_attendance_table,
     upsert_attendance,
     get_attendance_for_date,
     get_today_summary,
