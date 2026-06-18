@@ -5,9 +5,6 @@ from flask import Flask, jsonify
 
 from db_neon import init_app as init_db_app
 from db_local import init_local_db
-from routes.admin_attendance_routes import att_bp
-from routes.admin_routes import admin_bp
-from routes.admin_salary_routes import salary_bp
 from routes.auth_routes import auth_bp
 from routes.customer_routes import customer_bp
 from routes.main_routes import main_bp
@@ -147,9 +144,6 @@ def create_app():
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(customer_bp)
-    app.register_blueprint(admin_bp)
-    app.register_blueprint(salary_bp)
-    app.register_blueprint(att_bp)
 
     @app.route("/health")
     def health_check():
@@ -158,6 +152,7 @@ def create_app():
             "environment": environment,
             "database_url_found": True,
             "local_db": "initialised",
+            "mode": "public",
             "message": "Garage Management System Running",
         })
 

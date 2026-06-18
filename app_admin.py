@@ -9,7 +9,6 @@ from routes.admin_attendance_routes import att_bp
 from routes.admin_routes import admin_bp
 from routes.admin_salary_routes import salary_bp
 from routes.auth_routes import auth_bp
-from routes.customer_routes import customer_bp
 from routes.main_routes import main_bp
 from services.auth_service import ensure_session_user
 
@@ -146,7 +145,6 @@ def create_app():
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
-    app.register_blueprint(customer_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(salary_bp)
     app.register_blueprint(att_bp)
@@ -158,6 +156,7 @@ def create_app():
             "environment": environment,
             "database_url_found": True,
             "local_db": "initialised",
+            "mode": "admin",
             "message": "Garage Management System Running",
         })
 
@@ -171,6 +170,6 @@ if __name__ == "__main__":
     app.config["TEMPLATES_AUTO_RELOAD"] = True
     app.run(
         host="0.0.0.0",
-        port=int(os.environ.get("PORT", 5000)),
+        port=int(os.environ.get("PORT", 5050)),
         debug=not is_railway_environment(),
     )
