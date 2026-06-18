@@ -1,0 +1,864 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Shreeji Auto Services{% endblock %}
+
+{% block extra_head %}
+<style>
+  .verify-book-card {
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at top right, rgba(162, 4, 5, 0.12), transparent 35%),
+      linear-gradient(145deg, rgba(26, 26, 30, 0.98) 0%, rgba(33, 33, 40, 0.96) 100%);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .verify-book-card::after {
+    content: "";
+    position: absolute;
+    inset: auto -120px -120px auto;
+    width: 260px;
+    height: 260px;
+    border-radius: 999px;
+    background: rgba(162, 4, 5, 0.18);
+    filter: blur(10px);
+    pointer-events: none;
+  }
+
+  .verify-book-grid {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .verify-copy {
+    max-width: 520px;
+  }
+
+  .verify-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.45rem 0.9rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  .verify-title {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(2rem, 4vw, 2.8rem);
+    font-weight: 800;
+    line-height: 1.05;
+    margin: 1rem 0 0.85rem;
+  }
+
+  .verify-subtitle {
+    color: rgba(255, 255, 255, 0.72);
+    margin-bottom: 0;
+    max-width: 520px;
+  }
+
+  .verify-step-card,
+  .booking-step-card,
+  .success-step-card {
+    background: rgba(255, 255, 255, 0.98);
+    color: #1a1a1e;
+    border-radius: 24px;
+    padding: 1.35rem;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
+  }
+
+  .booking-step-card,
+  .success-step-card {
+    margin-top: 1rem;
+  }
+
+  .step-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(162, 4, 5, 0.12);
+    color: #a20405;
+    font-weight: 800;
+    margin-bottom: 0.85rem;
+  }
+
+  .step-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 800;
+    margin-bottom: 0.35rem;
+  }
+
+  .step-copy {
+    color: #5b5b62;
+    margin-bottom: 1rem;
+  }
+
+  .verify-book-card .form-control,
+  .verify-book-card .form-select {
+    min-height: 54px;
+    border-radius: 16px;
+    border-color: rgba(26, 26, 30, 0.12);
+    box-shadow: none;
+  }
+
+  .verify-book-card .form-control:focus,
+  .verify-book-card .form-select:focus {
+    border-color: rgba(162, 4, 5, 0.5);
+    box-shadow: 0 0 0 0.24rem rgba(162, 4, 5, 0.12);
+  }
+
+  .verify-book-card .btn {
+    min-height: 54px;
+    border-radius: 16px;
+    font-weight: 700;
+  }
+
+  .verify-book-card .btn-danger {
+    background: linear-gradient(135deg, #c32728 0%, #a20405 55%, #7c0304 100%);
+    border: none;
+  }
+
+  .verify-hint {
+    color: #8d8d96;
+    font-size: 0.92rem;
+    margin-top: 0.75rem;
+  }
+
+  .success-step-card {
+    border: 1px solid rgba(34, 197, 94, 0.22);
+    background: linear-gradient(135deg, rgba(240, 253, 244, 0.98), rgba(236, 253, 245, 0.98));
+  }
+
+  .success-step-card h3 {
+    color: #166534;
+    font-family: 'Syne', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 800;
+    margin-bottom: 0.55rem;
+  }
+
+  .success-step-card p {
+    color: #1f2937;
+    margin-bottom: 0;
+  }
+
+  .booking-history-card .dash-table td strong {
+    color: #a20405;
+  }
+
+  .booking-history-card .dash-table-wrap {
+    overflow-x: auto;
+  }
+
+  .booking-history-card .dash-table {
+    min-width: 520px;
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.84rem;
+    font-weight: 700;
+    text-transform: capitalize;
+  }
+
+  .status-pill.pending {
+    background: rgba(245, 158, 11, 0.14);
+    color: #b45309;
+  }
+
+  .status-pill.approved {
+    background: rgba(34, 197, 94, 0.14);
+    color: #15803d;
+  }
+
+  .status-pill.checked_in {
+    background: rgba(59, 130, 246, 0.14);
+    color: #1d4ed8;
+  }
+
+  .status-pill.rejected {
+    background: rgba(239, 68, 68, 0.14);
+    color: #b91c1c;
+  }
+
+  .status-pill.completed {
+    background: rgba(107, 114, 128, 0.16);
+    color: #4b5563;
+  }
+
+  .status-pill.other {
+    background: rgba(59, 130, 246, 0.14);
+    color: #1d4ed8;
+  }
+
+  .verify-hidden {
+    display: none;
+  }
+
+  @media (max-width: 991px) {
+    .verify-book-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-wrap">
+  <div class="dash-header">
+    <h1 class="dash-title">Welcome, {{ session.user.name }}</h1>
+    <p class="dash-sub">{{ session.user.id }}</p>
+  </div>
+
+  {% if due_for_service %}
+  <div class="dash-card" style="border:1px solid rgba(245, 158, 11, 0.35); background:linear-gradient(135deg, rgba(255, 251, 235, 0.98), rgba(255, 247, 237, 0.98));">
+    <h2 class="dash-card-title" style="color:#b45309;">
+      <i class="fas fa-bell"></i> Service Reminder
+    </h2>
+    <p style="margin:0; color:#92400e; font-weight:700;">Your vehicle is due for service.</p>
+    {% if latest_completed_booking %}
+    <p class="verify-hint" style="margin-top:0.5rem; color:#92400e;">Last completed booking: {{ latest_completed_booking.booking_id }} on {{ latest_completed_booking.completed_at or latest_completed_booking.date }}.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if last_service_date or next_service_date %}
+  <div class="dash-card">
+    <h2 class="dash-card-title">
+      <i class="fas fa-calendar-days"></i> Service Timeline
+    </h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;">
+      <div>
+        <div class="verify-hint" style="margin-top:0;">Last Service</div>
+        <div style="font-weight:800;color:#1f2937;">{{ last_service_date or '-' }}</div>
+      </div>
+      <div>
+        <div class="verify-hint" style="margin-top:0;">Next Service</div>
+        <div style="font-weight:800;color:#1f2937;">{{ next_service_date or '-' }}</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="dash-card verify-book-card">
+    <div class="verify-book-grid">
+      <div class="verify-copy">
+        <span class="verify-eyebrow">
+          <i class="fas fa-calendar-check"></i>
+          Direct Service Booking
+        </span>
+        <h2 class="verify-title">Book your next service without leaving the dashboard.</h2>
+        <p class="verify-subtitle">Your account details are already linked to this session. Choose your vehicle details, pick an available date, and send your booking request instantly.</p>
+      </div>
+
+      <div>
+        <div id="bookingStepCard" class="booking-step-card" style="margin-top:0;">
+          <div class="step-label">1</div>
+          <h3 class="step-title">Complete Booking Form</h3>
+          <p class="step-copy">Your customer details are pre-filled from your login. Choose your vehicle details and preferred service date from the available slots.</p>
+
+          <form id="dashboardBookingForm">
+            <input type="hidden" name="customer_id" value="{{ customer.id }}">
+
+            <div class="mb-3">
+              <label for="customerName" class="form-label fw-bold">Name</label>
+              <input type="text" class="form-control" id="customerName" value="{{ customer.name }}" readonly>
+            </div>
+
+            <div class="mb-3">
+              <label for="customerPhone" class="form-label fw-bold">Phone</label>
+              <input type="text" class="form-control" id="customerPhone" name="customer_phone" value="{{ customer.phone or session.get('phone', '') }}" readonly>
+            </div>
+
+            <div class="mb-3">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <label class="form-label fw-bold" style="margin:0;">Vehicle Number Plate</label>
+                <button type="button" id="addVehicleBtn" class="btn btn-sm btn-outline-danger" style="font-size:0.85rem;">
+                  <i class="fas fa-plus-circle"></i> Add Vehicle
+                </button>
+              </div>
+              <div id="vehicleListContainer" style="border:1px solid #ddd; border-radius:8px; padding:0.75rem; background:#f8f9fa; min-height:50px; display:none;">
+                <div id="vehicleList" style="display:flex; flex-direction:column; gap:0.5rem;">
+                  <p style="margin:0; color:#6c757d; font-size:0.9rem; text-align:center;">Loading vehicles...</p>
+                </div>
+              </div>
+              <input type="hidden" id="selectedVehicleForDashboard" name="vehicle_number" required />
+              <div class="invalid-feedback" id="vehicleError" style="display:none; color:#dc3545; font-size:0.875rem; margin-top:0.25rem;"></div>
+            </div>
+
+            <div class="mb-3">
+              <label for="brandModel" class="form-label fw-bold">Brand / Model</label>
+              <input type="text" class="form-control" id="brandModel" name="brand_model" placeholder="Auto-filled when vehicle selected" readonly>
+            </div>
+
+            <div class="mb-3">
+              <label for="serviceType" class="form-label fw-bold">Service Type *</label>
+              <select class="form-select" id="serviceType" name="service" required>
+                <option value="">Select Service</option>
+                <option value="Full Service">Full Service</option>
+                <option value="Engine Work">Engine Work</option>
+                <option value="Washing">Washing</option>
+              </select>
+              <div class="invalid-feedback" id="serviceError" style="display:none; color:#dc3545; font-size:0.875rem; margin-top:0.25rem;"></div>
+            </div>
+
+            <div class="mb-3">
+              <label for="bookingDate" class="form-label fw-bold">Preferred Date *</label>
+              <select class="form-select" id="bookingDate" name="date" required>
+                <option value="">Select Date</option>
+                {% for slot in date_slots if slot.available > 0 %}
+                <option value="{{ slot.date }}">{{ slot.label }}</option>
+                {% endfor %}
+              </select>
+              <div class="invalid-feedback" id="dateError" style="display:none; color:#dc3545; font-size:0.875rem; margin-top:0.25rem;"></div>
+            </div>
+
+            <button type="submit" class="btn btn-danger w-100" data-loading-text="Sending...">
+              <i class="fas fa-paper-plane me-2"></i>
+              Send Booking Request
+            </button>
+
+          </form>
+
+          <div id="addVehicleModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:99999; flex-items:center; justify-content:center;">
+            <div style="background:white; border-radius:16px; padding:2rem; max-width:450px; width:90%; margin:auto; margin-top: 2rem; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); box-shadow:0 25px 50px rgba(0,0,0,0.2);">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h3 id="dashboardVehicleModalTitle" style="margin:0; font-family:'Syne',sans-serif; font-size:1.5rem; font-weight:800; color:#a20405;">Add New Vehicle</h3>
+                <button type="button" id="closeAddVehicleModal" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:#6c757d;">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+              
+              <div class="mb-3">
+                <label class="form-label fw-bold">Plate Number *</label>
+                <input type="text" id="dashboardNewPlate" class="form-control" placeholder="GJ01AB1234" style="text-transform:uppercase;" />
+              </div>
+              
+              <div class="mb-3">
+                <label class="form-label fw-bold">Brand *</label>
+                <input type="text" id="dashboardNewBrand" class="form-control" placeholder="Honda" />
+              </div>
+              
+              <div class="mb-3">
+                <label class="form-label fw-bold">Model (Optional)</label>
+                <input type="text" id="dashboardNewModel" class="form-control" placeholder="Activa 6G" />
+              </div>
+
+              <div id="addVehicleMessage" style="margin-bottom:1rem; padding:0.75rem; border-radius:8px; display:none;"></div>
+
+              <div style="display:flex; gap:0.75rem;">
+                <button type="button" id="dashboardSaveVehicle" class="btn btn-danger flex-grow-1">
+                  <i class="fas fa-save"></i> Save Vehicle
+                </button>
+                <button type="button" id="dashboardCancelVehicle" class="btn btn-secondary flex-grow-1">
+                  <i class="fas fa-times"></i> Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div id="bookingMessage" class="verify-hint">Available dates are loaded from your current slot schedule.</div>
+        </div>
+
+        <div id="bookingSuccessCard" class="success-step-card verify-hidden">
+          <div class="step-label" style="background: rgba(34, 197, 94, 0.14); color: #15803d;">2</div>
+          <h3>Booking request sent successfully.</h3>
+          <p id="bookingSuccessText">Your Booking ID is BOOKXXXX. Please wait for confirmation or check WhatsApp or revisit this site in a few hours.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-card booking-history-card">
+    <h2 class="dash-card-title">
+      <i class="fas fa-history"></i> Customer History
+    </h2>
+    <p class="verify-hint" style="margin-top:-0.25rem; margin-bottom:1rem;">All your past bookings are shown here with the latest request first.</p>
+    {% if bookings %}
+    <div class="dash-table-wrap">
+      <table class="dash-table">
+        <thead>
+          <tr>
+            <th>Booking ID</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Service</th>
+          </tr>
+        </thead>
+        <tbody id="bookingHistoryTableBody">
+          {% for b in bookings %}
+          {% set booking_status = (b.status or 'pending')|lower %}
+          <tr>
+            <td><strong>{{ b.booking_id }}</strong></td>
+            <td>{{ b.date }}</td>
+            <td>
+              <span class="status-pill {{ booking_status if booking_status in ['pending', 'approved', 'checked_in', 'rejected', 'completed'] else 'other' }}">
+                {% if booking_status == 'checked_in' %}
+                  In Progress
+                {% elif booking_status == 'completed' %}
+                  Completed
+                {% else %}
+                  {{ b.status_display or b.status }}
+                {% endif %}
+              </span>
+              {% if booking_status == 'checked_in' %}
+              <div class="verify-hint">Service is in progress{% if b.checked_in_at %} since {{ b.checked_in_at }}{% endif %}.</div>
+              {% elif booking_status == 'completed' %}
+              <div class="verify-hint">Service completed{% if b.completed_at %} on {{ b.completed_at }}{% endif %}.</div>
+              {% endif %}
+            </td>
+            <td>{{ b.service }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="text-align:center; padding:2rem 1rem;" id="emptyBookingsText">
+      <i class="fas fa-clipboard-list" style="font-size:3rem; color:#9ca3af; margin-bottom:0.75rem; display:block;"></i>
+      <p style="margin:0; color:#6b7280; font-weight:500;">No bookings yet</p>
+      <p style="margin:0.25rem 0 0; color:#9ca3af; font-size:0.9rem;">Book your first service to see it here.</p>
+    </div>
+
+    <div class="dash-table-wrap">
+      <table class="dash-table verify-hidden" id="bookingHistoryTable">
+        <thead>
+          <tr>
+            <th>Booking ID</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Service</th>
+          </tr>
+        </thead>
+        <tbody id="bookingHistoryTableBody"></tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const customerPhone = "{{ session.get('phone', '') }}";
+    const customerID = "{{ session.get('customer_id', '') }}";
+    const identifier = customerPhone || customerID;
+    const vehicleListContainer = document.getElementById('vehicleListContainer');
+    const vehicleList = document.getElementById('vehicleList');
+    const selectedVehicleInput = document.getElementById('selectedVehicleForDashboard');
+    const brandModelInput = document.getElementById('brandModel');
+    const addVehicleBtn = document.getElementById('addVehicleBtn');
+    const addVehicleModal = document.getElementById('addVehicleModal');
+    const dashboardVehicleModalTitle = document.getElementById('dashboardVehicleModalTitle');
+    const closeAddVehicleModalBtn = document.getElementById('closeAddVehicleModal');
+    const dashboardSaveVehicle = document.getElementById('dashboardSaveVehicle');
+    const dashboardCancelVehicle = document.getElementById('dashboardCancelVehicle');
+    const dashboardNewPlate = document.getElementById('dashboardNewPlate');
+    const dashboardNewBrand = document.getElementById('dashboardNewBrand');
+    const dashboardNewModel = document.getElementById('dashboardNewModel');
+    const addVehicleMessage = document.getElementById('addVehicleMessage');
+    let editingVehicleId = null;
+
+    if (!identifier || !vehicleListContainer) return;
+
+    function loadVehicles() {
+      fetch('/api/vehicles/' + encodeURIComponent(identifier))
+        .then(res => res.json())
+        .then(data => {
+          const vehicles = data.vehicles || [];
+          vehicleList.innerHTML = '';
+
+          if (vehicles.length === 0) {
+            vehicleList.innerHTML = '<div style="text-align:center; padding:1rem;"><i class="fas fa-motorcycle" style="font-size:2rem; color:#9ca3af; margin-bottom:0.5rem; display:block;"></i><p style="margin:0; color:#6c757d; font-size:0.9rem;">No vehicles found.</p><button type="button" class="btn btn-sm btn-outline-danger mt-2" onclick="document.getElementById(\'addVehicleBtn\').click()"><i class="fas fa-plus"></i> Add New Vehicle</button></div>';
+            vehicleListContainer.style.display = 'block';
+            return;
+          }
+
+
+          vehicleListContainer.style.display = 'block';
+          vehicles.forEach(v => {
+            const vehicleItem = document.createElement('div');
+            vehicleItem.style.cssText = 'background:white; border:1px solid #dee2e6; border-radius:8px; overflow:hidden;';
+            const plate = v.number_plate || v.plate_number;
+            const brandModel = (v.brand_model || `${v.brand || ''} ${v.model || ''}`).trim();
+            const displayText = brandModel ? `${plate} (${brandModel})` : plate;
+            vehicleItem.innerHTML = `
+              <label style="display:flex; align-items:center; gap:0.75rem; padding:0.8rem; cursor:pointer; margin:0;">
+                <input type="radio" name="vehicleOption" value="${plate}" data-brand-model="${brandModel}" style="cursor:pointer;">
+                <div style="flex:1; min-width:0;">
+                  <div style="font-weight:800; color:#1f2937;">${displayText}</div>
+                </div>
+              </label>
+              <div style="display:flex; border-top:1px solid #dee2e6;">
+                <button type="button" class="vehicle-edit" style="flex:1; display:flex; align-items:center; justify-content:center; gap:0.4rem; padding:0.65rem; border:0; background:#f8f9fa; color:#1f2937; font-weight:600; font-size:0.85rem; cursor:pointer;">
+                  <i class="fas fa-pen"></i> Edit
+                </button>
+                <div style="width:1px; background:#dee2e6;"></div>
+                <button type="button" class="vehicle-delete" style="flex:1; display:flex; align-items:center; justify-content:center; gap:0.4rem; padding:0.65rem; border:0; background:#fff5f5; color:#dc2626; font-weight:600; font-size:0.85rem; cursor:pointer;">
+                  <i class="fas fa-trash"></i> Remove
+                </button>
+              </div>
+            `;
+
+            const radio = vehicleItem.querySelector('input[type="radio"]');
+            radio.addEventListener('change', function() {
+              selectedVehicleInput.value = this.value;
+              brandModelInput.value = this.dataset.brandModel || '';
+            });
+
+            const editButton = vehicleItem.querySelector('.vehicle-edit');
+            const deleteButton = vehicleItem.querySelector('.vehicle-delete');
+            editButton.addEventListener('mouseenter', () => {
+              editButton.style.background = '#e9ecef';
+            });
+            editButton.addEventListener('mouseleave', () => {
+              editButton.style.background = '#f8f9fa';
+            });
+            deleteButton.addEventListener('mouseenter', () => {
+              deleteButton.style.background = '#fee2e2';
+            });
+            deleteButton.addEventListener('mouseleave', () => {
+              deleteButton.style.background = '#fff5f5';
+            });
+            editButton.addEventListener('click', function(event) {
+              event.preventDefault();
+              event.stopPropagation();
+              if (!v.id) {
+                showToast('This vehicle cannot be edited. Please add it again first.', 'error');
+                return;
+              }
+              openVehicleModal(v);
+            });
+            deleteButton.addEventListener('click', async function(event) {
+              event.preventDefault();
+              event.stopPropagation();
+              if (!v.id) {
+                showToast('This vehicle cannot be removed here. Contact support.', 'error');
+                return;
+              }
+              if (!confirm(`Remove ${plate} from your account?`)) return;
+
+              const originalLabel = deleteButton.innerHTML;
+              deleteButton.disabled = true;
+              deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Removing...';
+
+              try {
+                const response = await fetch(`/api/customer/vehicle/${v.id}`, { method: 'DELETE' });
+                const result = await response.json();
+                if (result.success) {
+                  if (selectedVehicleInput.value === plate) {
+                    selectedVehicleInput.value = '';
+                    brandModelInput.value = '';
+                  }
+                  showToast(`${plate} removed successfully.`, 'success');
+                  loadVehicles();
+                } else {
+                  deleteButton.disabled = false;
+                  deleteButton.innerHTML = originalLabel;
+                  showToast(result.message || 'Could not remove vehicle', 'error');
+                }
+              } catch (error) {
+                deleteButton.disabled = false;
+                deleteButton.innerHTML = originalLabel;
+                showToast('Could not remove vehicle. Please try again.', 'error');
+              }
+            });
+            
+            vehicleList.appendChild(vehicleItem);
+          });
+        })
+        .catch(() => {
+          vehicleList.innerHTML = '<p style="margin:0; color:#dc3545; font-size:0.9rem; text-align:center;">Error loading vehicles</p>';
+          vehicleListContainer.style.display = 'block';
+        });
+    }
+
+    function splitBrandModel(value) {
+      const parts = (value || '').trim().split(/\s+/);
+      if (!parts.length || !parts[0]) return ['', ''];
+      return [parts[0], parts.slice(1).join(' ')];
+    }
+
+    function openVehicleModal(vehicle) {
+      editingVehicleId = vehicle && vehicle.id ? vehicle.id : null;
+      const plate = vehicle ? (vehicle.number_plate || vehicle.plate_number || '') : '';
+      const brandModel = vehicle ? (vehicle.brand_model || `${vehicle.brand || ''} ${vehicle.model || ''}`).trim() : '';
+      const [brand, model] = splitBrandModel(brandModel);
+
+      dashboardVehicleModalTitle.textContent = editingVehicleId ? 'Edit Vehicle' : 'Add New Vehicle';
+      dashboardNewPlate.value = plate;
+      dashboardNewBrand.value = brand;
+      dashboardNewModel.value = model;
+      dashboardNewPlate.readOnly = Boolean(editingVehicleId);
+      dashboardNewPlate.style.background = editingVehicleId ? '#f3f4f6' : '';
+      dashboardNewPlate.title = editingVehicleId ? 'Number plate cannot be changed. Remove and re-add to change it.' : '';
+      addVehicleMessage.style.display = 'none';
+      addVehicleModal.style.display = 'flex';
+
+      if (editingVehicleId) {
+        dashboardNewBrand.focus();
+      } else {
+        dashboardNewPlate.focus();
+      }
+    }
+
+    addVehicleBtn.addEventListener('click', function() {
+      openVehicleModal(null);
+    });
+
+    closeAddVehicleModalBtn.addEventListener('click', function() {
+      addVehicleModal.style.display = 'none';
+      editingVehicleId = null;
+    });
+
+    dashboardCancelVehicle.addEventListener('click', function() {
+      addVehicleModal.style.display = 'none';
+      editingVehicleId = null;
+    });
+
+    addVehicleModal.addEventListener('click', function(e) {
+      if (e.target === addVehicleModal) {
+        addVehicleModal.style.display = 'none';
+        editingVehicleId = null;
+      }
+    });
+
+    dashboardSaveVehicle.addEventListener('click', async function() {
+      const plate = dashboardNewPlate.value.trim().toUpperCase();
+      const brand = dashboardNewBrand.value.trim();
+      const model = dashboardNewModel.value.trim();
+
+      if (!plate || !brand) {
+        showMessage('Plate number and brand are required', 'error');
+        return;
+      }
+
+      if (!/^[A-Z0-9\s-]{4,15}$/.test(plate)) {
+        showMessage('Invalid plate number format', 'error');
+        return;
+      }
+
+      setLoading(dashboardSaveVehicle, true);
+
+      try {
+        const brandModel = (brand + (model ? ' ' + model : '')).trim();
+        const response = editingVehicleId
+          ? await fetch(`/api/customer/vehicle/${editingVehicleId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ number_plate: plate, brand_model: brandModel })
+            })
+          : await fetch('/api/vehicles/add', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ plate_number: plate, brand, model })
+            });
+        const result = await response.json();
+
+        if (result.success) {
+          showToast(editingVehicleId ? 'Vehicle updated successfully!' : 'Vehicle added successfully!', 'success');
+          addVehicleModal.style.display = 'none';
+          const savedPlate = plate;
+          editingVehicleId = null;
+          setTimeout(() => {
+            loadVehicles();
+            setTimeout(() => {
+              const radios = vehicleList.querySelectorAll('input[type="radio"]');
+              radios.forEach(radio => {
+                if (radio.value === savedPlate) {
+                  radio.checked = true;
+                  radio.dispatchEvent(new Event('change'));
+                }
+              });
+            }, 300);
+          }, 300);
+        } else {
+          showMessage(result.message || result.error || 'Failed to add vehicle', 'error');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        showMessage('Network error. Please try again.', 'error');
+      } finally {
+        setLoading(dashboardSaveVehicle, false);
+      }
+    });
+
+
+    function showMessage(message, type) {
+      addVehicleMessage.textContent = message;
+      addVehicleMessage.style.display = 'block';
+      addVehicleMessage.style.background = type === 'error' ? '#fee' : '#efe';
+      addVehicleMessage.style.color = type === 'error' ? '#c33' : '#3c3';
+      addVehicleMessage.style.border = `1px solid ${type === 'error' ? '#fcc' : '#cfc'}`;
+    }
+
+    loadVehicles();
+});
+
+  const bookingStepCard = document.getElementById('bookingStepCard');
+  const bookingForm = document.getElementById('dashboardBookingForm');
+  const bookingMessage = document.getElementById('bookingMessage');
+  const bookingSuccessCard = document.getElementById('bookingSuccessCard');
+  const bookingSuccessText = document.getElementById('bookingSuccessText');
+  const emptyBookingsText = document.getElementById('emptyBookingsText');
+  const bookingHistoryTable = document.getElementById('bookingHistoryTable');
+  const bookingHistoryTableBody = document.getElementById('bookingHistoryTableBody');
+
+  function setBookingMessage(message, tone) {
+    bookingMessage.textContent = message;
+    bookingMessage.style.color = tone === 'success' ? '#166534' : tone === 'error' ? '#b91c1c' : '#6b7280';
+  }
+
+  function formatStatusClass(status) {
+    const lower = (status || 'pending').toLowerCase();
+    if (lower === 'pending' || lower === 'approved' || lower === 'checked_in' || lower === 'rejected' || lower === 'completed') {
+      return lower;
+    }
+    return 'other';
+  }
+
+function getStatusDisplay(status) {
+    const lower = (status || 'pending').toLowerCase();
+    if (lower === 'pending') {
+      return 'Waiting for Approval';
+    }
+    if (lower === 'approved') {
+      return 'Approved';
+    }
+    if (lower === 'checked_in') {
+      return 'In Progress';
+    }
+    if (lower === 'rejected') {
+      return 'Rejected';
+    }
+    if (lower === 'completed') {
+      return 'Service Done';
+    }
+    return status;
+  }
+
+
+
+  function appendBookingToHistory(bookingId, date, service, status) {
+    if (!bookingHistoryTableBody) {
+      return;
+    }
+
+    if (emptyBookingsText) {
+      emptyBookingsText.classList.add('verify-hidden');
+    }
+
+    if (bookingHistoryTable) {
+      bookingHistoryTable.classList.remove('verify-hidden');
+    }
+
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><strong>${bookingId}</strong></td>
+      <td>${date}</td>
+      <td><span class="status-pill ${formatStatusClass(status)}">${getStatusDisplay(status)}</span></td>
+      <td>${service}</td>
+    `;
+
+    bookingHistoryTableBody.insertBefore(row, bookingHistoryTableBody.firstChild);
+  }
+
+  bookingForm.addEventListener('submit', async function(event) {
+    event.preventDefault();
+
+    const vehicleError = document.getElementById('vehicleError');
+    const serviceError = document.getElementById('serviceError');
+    const dateError = document.getElementById('dateError');
+    if (vehicleError) { vehicleError.style.display = 'none'; vehicleError.textContent = ''; }
+    if (serviceError) { serviceError.style.display = 'none'; serviceError.textContent = ''; }
+    if (dateError) { dateError.style.display = 'none'; dateError.textContent = ''; }
+
+    const formData = new FormData(bookingForm);
+    const vehicle = formData.get('vehicle_number');
+    const service = formData.get('service');
+    const date = formData.get('date');
+
+    let hasError = false;
+    if (!vehicle) {
+      if (vehicleError) {
+        vehicleError.textContent = 'Please select a vehicle';
+        vehicleError.style.display = 'block';
+      }
+      hasError = true;
+    }
+    if (!service) {
+      if (serviceError) {
+        serviceError.textContent = 'Please select a service type';
+        serviceError.style.display = 'block';
+      }
+      hasError = true;
+    }
+    if (!date) {
+      if (dateError) {
+        dateError.textContent = 'Please select a preferred date';
+        dateError.style.display = 'block';
+      }
+      hasError = true;
+    }
+    if (hasError) {
+      return;
+    }
+
+    const submitBtn = bookingForm.querySelector('button[type="submit"]');
+    setLoading(submitBtn, true);
+
+    let response;
+    let result;
+
+    try {
+      response = await fetch('/book', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      });
+      result = await response.json();
+    } catch (error) {
+      setBookingMessage('Something went wrong while sending your booking request. Please try again.', 'error');
+      showToast('Network error. Please try again.', 'error');
+      return;
+    } finally {
+      setLoading(submitBtn, false);
+    }
+
+    if (response.ok && result.success) {
+      const bookingId = result.booking_id || 'BOOKXXXX';
+      bookingSuccessText.textContent = `Booking request sent successfully. Your Booking ID is ${bookingId}. Please wait for confirmation or check WhatsApp or revisit this site in a few hours.`;
+      bookingSuccessCard.classList.remove('verify-hidden');
+      setBookingMessage(`Booking created successfully with ID ${bookingId}.`, 'success');
+      appendBookingToHistory(bookingId, date, service, 'pending');
+      showToast('Booking request sent successfully!', 'success');
+      bookingForm.reset();
+      brandModelInput.value = '';
+      return;
+    }
+
+    setBookingMessage(result.message || 'Booking could not be completed. Please check your selected date and try again.', 'error');
+    showToast(result.message || 'Booking failed. Please try again.', 'error');
+  });
+
+</script>
+{% endblock %}

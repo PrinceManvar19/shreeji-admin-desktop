@@ -1,0 +1,566 @@
+{% extends "admin_base.html" %}
+{% block title %}Salary Calculator - Admin{% endblock %}
+
+{% block content %}
+<style>
+  .salary-page { max-width:1280px; margin:0 auto; padding:2rem 1.5rem 3rem; }
+
+  .salary-header { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1.35rem; flex-wrap:wrap; }
+  .salary-title { display:flex; align-items:center; gap:0.9rem; }
+  .salary-icon { width:52px; height:52px; border-radius:13px; background:linear-gradient(135deg,#a20405,#c9393a); color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 12px 28px rgba(162,4,5,0.25); }
+  .salary-title h1 { font-family:var(--font-head); font-size:1.55rem; font-weight:900; margin:0; }
+  .salary-title p { margin:0.1rem 0 0; color:var(--text-muted); font-size:0.9rem; }
+  .salary-grid { display:grid; grid-template-columns:minmax(0,1fr) 370px; gap:1.25rem; align-items:start; }
+  .salary-left { display:flex; flex-direction:column; gap:1rem; }
+  .pay-card { background:#fff; border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow-card); overflow:hidden; }
+  .pay-card-header { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; padding:1rem 1.15rem; background:#fafafa; border-bottom:1px solid var(--border); }
+  .pay-card-header h3 { display:flex; align-items:center; gap:0.5rem; margin:0; font-family:var(--font-head); font-size:0.94rem; font-weight:900; }
+  .pay-card-header i { color:var(--accent); }
+  .pay-card-body { padding:1.15rem; }
+  .salary-label { display:block; color:var(--text-muted); font-size:0.75rem; font-weight:900; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:0.35rem; }
+  .salary-input, .salary-select { width:100%; padding:0.65rem 0.78rem; border:1.5px solid var(--border); border-radius:9px; background:#fff; color:var(--text-dark); outline:none; transition:border-color .18s, box-shadow .18s; }
+  .salary-input:focus, .salary-select:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(162,4,5,0.1); }
+  .form-grid-3 { display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:0.9rem; align-items:end; }
+  .form-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:0.9rem; }
+  .worker-strip { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0.75rem; margin-top:0.9rem; }
+  .mini-metric { border:1px solid #f0f0f3; border-radius:10px; padding:0.72rem 0.8rem; background:#fbfbfc; }
+  .mini-label { color:var(--text-muted); font-size:0.7rem; font-weight:900; letter-spacing:0.05em; text-transform:uppercase; }
+  .mini-value { font-family:var(--font-head); font-weight:900; color:var(--text-dark); margin-top:0.1rem; }
+  .attendance-bar { height:8px; border-radius:999px; background:#ececf0; overflow:hidden; margin-top:0.75rem; }
+  .attendance-fill { height:100%; width:0; border-radius:999px; background:linear-gradient(90deg,#a20405,#d9393a); transition:width .22s; }
+  .earnings-list { display:grid; gap:0.75rem; }
+  .earning-row { display:grid; grid-template-columns:44px 1fr 160px; gap:0.75rem; align-items:center; padding:0.75rem; border:1px solid #eeeeF2; border-radius:12px; background:#fff; }
+  .earning-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; }
+  .earning-title { font-weight:900; color:var(--text-dark); line-height:1.15; }
+  .earning-sub { color:var(--text-muted); font-size:0.76rem; margin-top:0.12rem; }
+  .earning-amount { text-align:right; font-family:var(--font-head); font-weight:900; }
+  .base .earning-icon { color:#2563eb; background:#eff6ff; }
+  .pocket .earning-icon { color:#c2410c; background:#fff7ed; }
+  .debt .earning-icon { color:#7c3aed; background:#f5f3ff; }
+  .history-list { display:none; margin-top:0.8rem; border-top:1px solid #f0f0f3; padding-top:0.8rem; color:var(--text-muted); font-size:0.84rem; }
+  .history-list.is-open { display:block; }
+  .history-list div { display:flex; justify-content:space-between; gap:0.75rem; padding:0.28rem 0; border-bottom:1px dashed #eeeeF2; }
+  .toggle { display:grid; grid-template-columns:1fr 1fr; border:1.5px solid var(--border); border-radius:9px; overflow:hidden; }
+  .toggle input { display:none; }
+  .toggle label { margin:0; padding:0.48rem 0.5rem; text-align:center; cursor:pointer; font-size:0.78rem; font-weight:900; color:#4b5563; }
+  .toggle input:checked + label { background:var(--accent); color:#fff; }
+  .summary-card { position:sticky; top:1rem; background:linear-gradient(135deg,#17171b,#2b2b31); color:#fff; border-radius:16px; overflow:hidden; box-shadow:0 20px 42px rgba(0,0,0,0.18); }
+  .summary-head { padding:1.25rem; border-bottom:1px solid rgba(255,255,255,0.1); }
+  .summary-label { color:rgba(255,255,255,0.58); font-size:0.74rem; font-weight:900; letter-spacing:0.08em; text-transform:uppercase; }
+  .summary-total { font-family:var(--font-head); font-size:2.35rem; line-height:1; font-weight:900; margin-top:0.35rem; overflow-wrap:anywhere; }
+  .summary-body { padding:1rem 1.25rem 1.25rem; }
+  .summary-row { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:0.65rem 0; border-bottom:1px solid rgba(255,255,255,0.08); color:rgba(255,255,255,0.78); font-size:0.88rem; }
+  .summary-row strong { color:#fff; font-family:var(--font-head); }
+  .summary-row.net { border-bottom:0; margin-top:0.35rem; color:#fff; font-weight:900; }
+  .btn-save-pdf { width:100%; display:inline-flex; align-items:center; justify-content:center; gap:0.5rem; border:0; border-radius:12px; padding:0.9rem 1rem; background:linear-gradient(135deg,#a20405,#d9393a); color:#fff; font-weight:900; box-shadow:0 14px 28px rgba(162,4,5,0.28); transition:transform .16s, box-shadow .16s; }
+  .btn-save-pdf:hover { transform:translateY(-1px); box-shadow:0 18px 34px rgba(162,4,5,0.35); color:#fff; }
+  .btn-ghost { display:inline-flex; align-items:center; justify-content:center; gap:0.4rem; border:1px solid var(--border); border-radius:9px; padding:0.55rem 0.85rem; background:#fff; color:var(--text-dark); font-size:0.84rem; font-weight:900; transition:all .16s; }
+  .btn-ghost:hover { border-color:rgba(162,4,5,0.35); color:var(--accent); background:#fff7f7; }
+  @media (max-width:1050px) { .salary-grid { grid-template-columns:1fr; } .summary-card { position:static; } }
+  @media (max-width:760px) { .form-grid-3,.form-grid-2,.worker-strip,.earning-row { grid-template-columns:1fr; } .earning-amount { text-align:left; } .salary-page { padding:1.25rem 4% 2.5rem; } }
+</style>
+
+{% set month_names = ['January','February','March','April','May','June','July','August','September','October','November','December'] %}
+
+<div class="salary-page">
+  <div class="salary-header">
+    <div class="salary-title">
+      <div class="salary-icon"><i class="fas fa-file-invoice-dollar"></i></div>
+      <div>
+        <h1>Salary Calculator</h1>
+        <p>Build a payslip with attendance, monthly advance deduction, pending advance recovery, and final payable.</p>
+      </div>
+    </div>
+    <a href="{{ url_for('salary.salary_history') }}" class="btn-ghost" data-loading-text="Loading...">
+      <i class="fas fa-history"></i> Salary History
+    </a>
+  </div>
+
+  <form id="salaryForm" method="POST">
+<!-- Submission flags for server workflow (do not duplicate) -->
+<!-- (hidden inputs already exist at top of form) -->
+
+
+    <div class="salary-grid">
+      <div class="salary-left">
+        <section class="pay-card">
+          <div class="pay-card-header">
+            <h3><i class="fas fa-calendar-days"></i> Salary Period</h3>
+          </div>
+          <div class="pay-card-body">
+            <div class="form-grid-3">
+              <div>
+                <label class="salary-label" for="month">Month</label>
+                <select class="salary-select" id="month" name="month" required>
+                  {% for m in range(1, 13) %}
+                  <option value="{{ '%02d'|format(m) }}" {% if current_month == '%02d'|format(m) %}selected{% endif %}>{{ month_names[m - 1] }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div>
+                <label class="salary-label" for="year">Year</label>
+                <select class="salary-select" id="year" name="year" required>
+                  {% for y in year_options %}
+                  <option value="{{ y }}" {% if current_year == y %}selected{% endif %}>{{ y }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div>
+                <label class="salary-label" for="total_days">Total Days</label>
+                <input type="number" class="salary-input" id="total_days" name="total_days" min="1" value="{{ current_total_days }}" required>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="pay-card">
+          <div class="pay-card-header">
+            <h3><i class="fas fa-user-check"></i> Worker & Attendance</h3>
+          </div>
+          <div class="pay-card-body">
+<div class="form-grid-2">
+              <div>
+                <label class="salary-label" for="worker_id">Worker</label>
+                <select class="salary-select" id="worker_id" name="worker_id" required>
+                  <option value="">Choose worker</option>
+                  {% for w in workers %}
+                  <option value="{{ w.id }}" data-name="{{ w.name }}" data-monthly="{{ w.monthly_salary }}" data-status="{{ w.worker_status or 'active' }}">
+                    {{ w.id }} - {{ w.name }}
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div>
+                <label class="salary-label" for="attended_days">Days Attended</label>
+                <input type="number" class="salary-input" id="attended_days" name="attended_days" step="0.5" min="0" value="{{ current_total_days }}" required>
+              </div>
+            </div>
+
+            <!-- Attendance mode toggle -->
+            <div style="display:flex; align-items:center; justify-content:space-between;
+            margin-top:0.85rem; margin-bottom:0.5rem; gap:1rem;">
+              <div style="font-size:0.78rem; font-weight:900; color:var(--text-muted);
+              text-transform:uppercase; letter-spacing:0.05em;">
+                Attendance Entry
+              </div>
+              <div style="display:flex; gap:0.5rem;">
+                <button type="button" id="btnAttManual"
+                class="btn-ghost" style="padding:0.35rem 0.75rem; font-size:0.78rem;"
+                aria-pressed="false">
+                  <i class="fas fa-pencil"></i> Manual
+                </button>
+                <button type="button" id="btnAttAuto"
+                class="btn-ghost" style="padding:0.35rem 0.75rem; font-size:0.78rem;"
+                aria-pressed="false">
+                  <i class="fas fa-bolt"></i> Auto-fill
+                </button>
+              </div>
+            </div>
+
+            <!-- Auto-fill status banner (hidden by default) -->
+            <div id="autoFillBanner" style="display:none; align-items:center; gap:0.6rem;
+     padding:0.65rem 0.85rem; border-radius:9px; background:#eff6ff;
+     border:1px solid #bfdbfe; font-size:0.84rem; font-weight:800;
+     color:#1d4ed8; margin-bottom:0.5rem;">
+              <i class="fas fa-circle-info"></i>
+              <span id="autoFillMsg">Fetching attendance…</span>
+            </div>
+            <div class="attendance-bar"><div class="attendance-fill" id="attendanceFill"></div></div>
+            <div class="worker-strip">
+              <div class="mini-metric"><div class="mini-label">Worker ID</div><div class="mini-value" id="wiId">Select worker</div></div>
+              <div class="mini-metric"><div class="mini-label">Monthly Salary</div><div class="mini-value" id="wiMonthly">&#8377;0.00</div></div>
+              <div class="mini-metric"><div class="mini-label">Per Day</div><div class="mini-value" id="wiPerDay">&#8377;0.00</div></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="pay-card">
+          <div class="pay-card-header">
+            <h3><i class="fas fa-receipt"></i> Salary Breakdown</h3>
+          </div>
+          <div class="pay-card-body">
+            <div class="earnings-list">
+              <div class="earning-row base">
+                <div class="earning-icon"><i class="fas fa-coins"></i></div>
+                <div><div class="earning-title">Base Salary</div><div class="earning-sub" id="baseSub">Based on attendance</div></div>
+                <div class="earning-amount" id="baseAmount">&#8377;0.00</div>
+              </div>
+
+              <div class="earning-row pocket">
+                <div class="earning-icon"><i class="fas fa-wallet"></i></div>
+                <div>
+                  <div class="earning-title">Monthly Advances</div>
+                  <div class="earning-sub" id="pocketSub">Auto deducted from this salary</div>
+                  <button type="button" class="btn-ghost" id="togglePocketHistory" style="margin-top:0.55rem; padding:0.35rem 0.65rem;">View Entry History</button>
+                  <div class="history-list" id="pocketHistory"></div>
+                </div>
+                <div class="earning-amount" id="pocketAmount">&#8377;0.00</div>
+              </div>
+
+              <div class="earning-row debt">
+                <div class="earning-icon"><i class="fas fa-scale-unbalanced"></i></div>
+                <div>
+                  <div class="earning-title">Pending Long-Term Advance</div>
+                  <div class="earning-sub" id="debtSub">Owner-controlled recovery from pending advance</div>
+                  <div style="margin-top:0.7rem;">
+                    <label class="salary-label" for="debt_recovery_amount">Recover Pending Advance</label>
+                    <input type="number" class="salary-input" id="debt_recovery_amount" name="debt_recovery_amount" min="0" step="0.01" value="0">
+                  </div>
+                  <div class="history-list is-open" id="debtHistory"></div>
+                </div>
+                <div class="earning-amount" id="debtOutstanding">&#8377;0.00</div>
+              </div>
+
+              <div class="earning-row" style="border-top:1px solid #f0f0f3;">
+                <div class="earning-icon" style="color:#0f766e; background:#f0fdfa;">
+                  <i class="fas fa-arrow-trend-up"></i>
+                </div>
+                <div>
+                  <div class="earning-title">Extra Salary</div>
+                  <div class="earning-sub">Given above earned amount — will be auto-logged as a loan to recover next month if needed</div>
+                  <div style="margin-top:0.7rem;">
+                    <label class="salary-label" for="extra_salary_amount">Extra Amount (₹)</label>
+                    <input type="number" class="salary-input" id="extra_salary_amount" name="extra_salary_amount" min="0" step="1" value="0" placeholder="0">
+                  </div>
+                  <div style="margin-top:0.4rem;">
+                    <label class="salary-label" for="extra_salary_note">Reason (optional)</label>
+                    <input type="text" class="salary-input" id="extra_salary_note" name="extra_salary_note" placeholder="e.g. Festival need, emergency">
+                  </div>
+                </div>
+                <div class="earning-amount" id="extraSalaryAmount" style="color:#0f766e;">&#8377;0.00</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <aside class="summary-card">
+        <div class="summary-head">
+          <div class="summary-label">Final Payable Salary</div>
+          <div class="summary-total">&#8377;<span id="totalAmount">0.00</span></div>
+        </div>
+        <div class="summary-body">
+          <div class="summary-row"><span>Attendance</span><strong id="summaryAttendance">0 / 0</strong></div>
+          <div class="summary-row"><span>Base Salary</span><strong id="summaryBase">&#8377;0.00</strong></div>
+          <div class="summary-row" style="color:#0f766e;"><span>Extra Salary (loan)</span><strong id="summaryExtra" style="color:#0f766e;">+&#8377;0.00</strong></div>
+          <div class="summary-row"><span>Monthly Advance Deducted</span><strong id="summaryPocket">-&#8377;0.00</strong></div>
+          <div class="summary-row"><span>Pending Advance Recovered</span><strong id="summaryDebtRecovery">-&#8377;0.00</strong></div>
+          <div class="summary-row"><span>Remaining Debt Balance</span><strong id="summaryDebtBalance">&#8377;0.00</strong></div>
+<div class="summary-row net"><span>Final Payable Salary</span><strong id="summaryNet">&#8377;0.00</strong></div>
+
+<input type="hidden" name="salary_status" id="salary_status_hidden" value="finalized">
+<input type="hidden" name="generate_slip" id="generate_slip_flag" value="0">
+
+<div style="display:grid; gap:0.65rem; margin-top:1rem;">
+  <button type="submit" class="btn-save-pdf" id="btnSaveGenerate"
+          data-loading-text="Saving…">
+    <i class="fas fa-file-invoice-dollar"></i> Save &amp; Generate Slip
+  </button>
+
+  <button type="submit" class="btn-ghost" style="width:100%;" id="btnDraft"
+          data-loading-text="Saving…">
+    <i class="fas fa-floppy-disk"></i> Save as Draft
+  </button>
+</div>
+
+        </div>
+      </aside>
+
+    </div>
+  </form>
+</div>
+
+<script type="application/json" id="daysByPeriodData">{{ days_by_period|tojson }}</script>
+<script>
+(function() {
+  'use strict';
+  let monthly = 0;
+  let pocketMoneyTotal = 0;
+  let pocketMoneyCount = 0;
+  let outstandingDebt = 0;
+  const daysByPeriodEl = document.getElementById('daysByPeriodData');
+  const daysByPeriod = daysByPeriodEl ? JSON.parse(daysByPeriodEl.textContent || '{}') : {};
+
+
+  function inr(value) {
+    return '&#8377;' + Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function daysInMonth(month, year) {
+    const y = String(year);
+    const m = String(month).padStart(2, '0');
+    if (daysByPeriod[y] && daysByPeriod[y][m]) {
+      return daysByPeriod[y][m];
+    }
+    return new Date(Number(year), Number(month), 0).getDate();
+  }
+
+  function recalculate() {
+    const totalDaysEl = document.getElementById('total_days');
+    const attendedEl = document.getElementById('attended_days');
+    const totalDays = Math.max(parseInt(totalDaysEl.value, 10) || 0, 0);
+    let attendedDays = Math.max(parseFloat(attendedEl.value) || 0, 0);
+    if (totalDays > 0 && attendedDays > totalDays) {
+      attendedDays = totalDays;
+      attendedEl.value = attendedDays;
+    }
+
+    const perDay = totalDays > 0 ? monthly / totalDays : 0;
+    const base = perDay * attendedDays;
+    const recoveryInput = document.getElementById('debt_recovery_amount');
+    let debtRecovery = Math.max(parseFloat(recoveryInput.value) || 0, 0);
+    const maxRecoverable = Math.max(Math.min(outstandingDebt, base - pocketMoneyTotal), 0);
+    if (debtRecovery > maxRecoverable) {
+      debtRecovery = maxRecoverable;
+      recoveryInput.value = debtRecovery.toFixed(2);
+    }
+    const remainingDebt = Math.max(outstandingDebt - debtRecovery, 0);
+    const extraInput = document.getElementById('extra_salary_amount');
+    const extraSalary = Math.max(parseFloat(extraInput?.value) || 0, 0);
+    const total = Math.max(base - pocketMoneyTotal - debtRecovery, 0) + extraSalary;
+    const pct = totalDays > 0 ? Math.round(attendedDays / totalDays * 100) : 0;
+
+    document.getElementById('wiPerDay').innerHTML = inr(perDay);
+    document.getElementById('baseAmount').innerHTML = inr(base);
+    document.getElementById('baseSub').textContent = attendedDays + ' of ' + totalDays + ' days';
+    document.getElementById('pocketAmount').innerHTML = inr(pocketMoneyTotal);
+    document.getElementById('pocketSub').textContent = pocketMoneyCount + ' entr' + (pocketMoneyCount === 1 ? 'y' : 'ies') + ' auto deducted';
+    document.getElementById('debtOutstanding').innerHTML = inr(outstandingDebt);
+    document.getElementById('extraSalaryAmount').innerHTML = inr(extraSalary);
+    document.getElementById('totalAmount').textContent = Number(total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    document.getElementById('summaryAttendance').textContent = attendedDays + ' / ' + totalDays;
+    document.getElementById('summaryBase').innerHTML = inr(base);
+    document.getElementById('summaryExtra').innerHTML = '+' + inr(extraSalary);
+    document.getElementById('summaryPocket').innerHTML = '-' + inr(pocketMoneyTotal);
+    document.getElementById('summaryDebtRecovery').innerHTML = '-' + inr(debtRecovery);
+    document.getElementById('summaryDebtBalance').innerHTML = inr(remainingDebt);
+    document.getElementById('summaryNet').innerHTML = inr(total);
+    document.getElementById('attendanceFill').style.width = pct + '%';
+  }
+
+  function renderHistory(container, rows, emptyText) {
+    if (!container) return;
+    if (!rows || !rows.length) {
+      container.innerHTML = '<div><span>' + emptyText + '</span><strong></strong></div>';
+      return;
+    }
+    container.innerHTML = rows.map(function(row) {
+      const date = row.entry_date || row.debt_date || row.recovery_date || '-';
+      const amount = row.amount || row.remaining_balance || 0;
+      const note = row.note || row.reason || '';
+      return '<div><span>' + date + (note ? ' - ' + note : '') + '</span><strong>' + inr(amount) + '</strong></div>';
+    }).join('');
+  }
+
+  function fetchAdvanceSummary() {
+    const workerId = document.getElementById('worker_id').value;
+    const month = document.getElementById('month').value;
+    const year = document.getElementById('year').value;
+    if (!workerId || !month || !year) {
+      pocketMoneyTotal = 0;
+      pocketMoneyCount = 0;
+      outstandingDebt = 0;
+      renderHistory(document.getElementById('pocketHistory'), [], 'Select a worker to view monthly advance history');
+      renderHistory(document.getElementById('debtHistory'), [], 'No outstanding debt');
+      recalculate();
+      return;
+    }
+
+    fetch('/admin/salary/advance-summary?worker_id=' + encodeURIComponent(workerId) + '&month=' + encodeURIComponent(month) + '&year=' + encodeURIComponent(year))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.error) return;
+        pocketMoneyTotal = Number(data.pocket_money_total || 0);
+        pocketMoneyCount = Number(data.pocket_money_count || 0);
+        outstandingDebt = Number(data.outstanding_debt || 0);
+        renderHistory(document.getElementById('pocketHistory'), data.pocket_entries || [], 'No monthly advance entries this month');
+        renderHistory(document.getElementById('debtHistory'), data.debts || [], 'No outstanding debt');
+        recalculate();
+      })
+      .catch(function() {
+        pocketMoneyTotal = 0;
+        pocketMoneyCount = 0;
+        outstandingDebt = 0;
+        recalculate();
+      });
+  }
+
+  function loadWorker() {
+    const select = document.getElementById('worker_id');
+    const option = select.options[select.selectedIndex];
+    monthly = option && option.value ? (parseFloat(option.dataset.monthly) || 0) : 0;
+    document.getElementById('wiId').textContent = option && option.value ? option.value : 'Select worker';
+    document.getElementById('wiMonthly').innerHTML = inr(monthly);
+    fetchAdvanceSummary();
+    recalculate();
+  }
+
+  function updatePeriodDays() {
+    const month = document.getElementById('month').value;
+    const year = document.getElementById('year').value;
+    const days = daysInMonth(month, year);
+    document.getElementById('total_days').value = days;
+    document.getElementById('attended_days').value = Math.min(parseFloat(document.getElementById('attended_days').value) || days, days);
+    fetchAdvanceSummary();
+    recalculate();
+  }
+
+  document.getElementById('btnSaveGenerate')?.addEventListener('click', function() {
+    document.getElementById('salary_status_hidden').value = 'finalized';
+    document.getElementById('generate_slip_flag').value = '1';
+  });
+  document.getElementById('btnDraft')?.addEventListener('click', function() {
+    document.getElementById('salary_status_hidden').value = 'draft';
+    document.getElementById('generate_slip_flag').value = '0';
+  });
+
+  ['month','year'].forEach(function(id) {
+    document.getElementById(id).addEventListener('change', updatePeriodDays);
+  });
+
+  ['worker_id','total_days','attended_days','debt_recovery_amount','extra_salary_amount'].forEach(function(id) {
+    document.getElementById(id).addEventListener(
+      id === 'worker_id' ? 'change' : 'input',
+      id === 'worker_id' ? loadWorker : recalculate
+    );
+  });
+
+  document.getElementById('togglePocketHistory')?.addEventListener('click', function() {
+    document.getElementById('pocketHistory')?.classList.toggle('is-open');
+  });
+  // --- Attendance auto-fill integration ---
+  var attMode = 'manual'; // 'manual' | 'auto'
+
+  function setAttMode(mode) {
+    attMode = mode;
+    var manualBtn = document.getElementById('btnAttManual');
+    var autoBtn = document.getElementById('btnAttAuto');
+    var banner = document.getElementById('autoFillBanner');
+    var attendedInput = document.getElementById('attended_days');
+
+    if (mode === 'auto') {
+      if (manualBtn) { manualBtn.style.background = ''; manualBtn.style.color = ''; }
+      if (autoBtn) { autoBtn.style.background = 'var(--accent)'; autoBtn.style.color = '#fff'; autoBtn.style.borderColor = 'var(--accent)'; }
+      if (attendedInput) {
+        attendedInput.readOnly = true;
+        attendedInput.style.background = '#f5f5f7';
+      }
+      if (banner) banner.style.display = 'flex';
+      fetchAutoAttendance();
+    } else {
+      if (autoBtn) { autoBtn.style.background = ''; autoBtn.style.color = ''; autoBtn.style.borderColor = ''; }
+      if (manualBtn) { manualBtn.style.background = 'var(--accent)'; manualBtn.style.color = '#fff'; manualBtn.style.borderColor = 'var(--accent)'; }
+      if (attendedInput) {
+        attendedInput.readOnly = false;
+        attendedInput.style.background = '';
+      }
+      if (banner) banner.style.display = 'none';
+    }
+  }
+
+  function fetchAutoAttendance() {
+    var workerId = document.getElementById('worker_id') ? document.getElementById('worker_id').value : '';
+    var month = document.getElementById('month') ? document.getElementById('month').value : '';
+    var year = document.getElementById('year') ? document.getElementById('year').value : '';
+    var banner = document.getElementById('autoFillBanner');
+    var msg = document.getElementById('autoFillMsg');
+
+    if (!workerId) {
+      if (msg) msg.textContent = 'Please select a worker first.';
+      if (banner) {
+        banner.style.background = '#fffbeb';
+        banner.style.borderColor = '#fde68a';
+        banner.style.color = '#92400e';
+      }
+      return;
+    }
+
+    if (!month || !year) return;
+
+    if (msg) msg.textContent = 'Fetching attendance records…';
+    if (banner) {
+      banner.style.background = '#eff6ff';
+      banner.style.borderColor = '#bfdbfe';
+      banner.style.color = '#1d4ed8';
+      banner.style.display = 'flex';
+    }
+
+    var url = '/admin/salary/attendance-preview?worker_id=' + encodeURIComponent(workerId)
+      + '&month=' + encodeURIComponent(month)
+      + '&year=' + encodeURIComponent(year);
+
+    fetch(url)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.error) {
+          if (msg) msg.textContent = 'Error: ' + data.error;
+          if (banner) {
+            banner.style.background = '#fef2f2';
+            banner.style.borderColor = '#fecaca';
+            banner.style.color = '#dc2626';
+          }
+          return;
+        }
+        if (!data.has_records) {
+          if (msg) msg.textContent = 'No attendance records found for this period. Switch to Manual.';
+          if (banner) {
+            banner.style.background = '#fffbeb';
+            banner.style.borderColor = '#fde68a';
+            banner.style.color = '#92400e';
+          }
+          return;
+        }
+
+        var attendedInput = document.getElementById('attended_days');
+        if (attendedInput) attendedInput.value = data.attended_days;
+        if (attendedInput) attendedInput.dispatchEvent(new Event('input'));
+
+        document.getElementById('total_days').value = data.total_days;
+
+        if (attendedInput) attendedInput.value = data.attended_days;
+        recalculate();
+
+        var missing = (data.missing_days > 0) ? (' (' + data.missing_days + ' days unrecorded)') : '';
+        if (msg) msg.textContent = 'Auto-filled: ' + data.attended_days + ' of ' + data.total_days + ' days attended' + missing + '.';
+
+        if (banner) {
+          banner.style.background = '#ecfdf3';
+          banner.style.borderColor = '#abefc6';
+          banner.style.color = '#067647';
+        }
+      })
+      .catch(function() {
+        if (msg) msg.textContent = 'Could not fetch attendance data.';
+        if (banner) {
+          banner.style.background = '#fef2f2';
+          banner.style.borderColor = '#fecaca';
+          banner.style.color = '#dc2626';
+        }
+      });
+  }
+
+  // initial wire
+  var manualBtn0 = document.getElementById('btnAttManual');
+  var autoBtn0 = document.getElementById('btnAttAuto');
+  if (manualBtn0) manualBtn0.addEventListener('click', function() { setAttMode('manual'); });
+  if (autoBtn0) autoBtn0.addEventListener('click', function() { setAttMode('auto'); });
+
+  ['month','year'].forEach(function(id) {
+    document.getElementById(id).addEventListener('change', function() {
+      if (attMode === 'auto') fetchAutoAttendance();
+    });
+  });
+
+  // When worker changes, refresh if in auto mode
+  var origLoadWorker = loadWorker;
+  loadWorker = function() {
+    origLoadWorker();
+    if (attMode === 'auto') fetchAutoAttendance();
+  };
+
+  // Default to manual (leave existing behavior)
+  loadWorker();
+})();
+</script>
+
+{% endblock %}

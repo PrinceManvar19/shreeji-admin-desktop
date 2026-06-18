@@ -58,9 +58,9 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     console=False,
-    icon=None,
+    icon='static/images/logo1.ico',
 )
 
 coll = COLLECT(
@@ -69,7 +69,7 @@ coll = COLLECT(
     a.zipfiles,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     name='ShreejiAdmin',
 )

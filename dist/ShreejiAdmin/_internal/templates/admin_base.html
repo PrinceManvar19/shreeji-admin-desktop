@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /> 
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Admin - Shreeji Auto Services{% endblock %}</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+
+  <style>
+    body {
+      background: #f7f7f7;
+    }
+
+    .admin-shell {
+      min-height: 100vh;
+      padding-left: 220px;
+    }
+
+    .admin-sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 1000;
+      width: 220px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: #1a1a1a;
+      color: #f0f0f0;
+      border-right: 1px solid rgba(162, 4, 5, 0.35);
+    }
+
+    .admin-sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      min-height: 82px;
+      padding: 1rem;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      flex-shrink: 0;
+    }
+
+    .admin-sidebar-brand img {
+      width: 46px;
+      height: 46px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
+    .admin-sidebar-name {
+      font-family: var(--font-head);
+      font-weight: 800;
+      line-height: 1.1;
+      color: #fff;
+      font-size: 0.95rem;
+    }
+
+    .admin-sidebar-sub {
+      display: block;
+      color: #b5b5b7;
+      font-family: var(--font-body);
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .admin-sidebar-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      padding: 1rem 0.7rem;
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,0.28) transparent;
+    }
+
+    .admin-sidebar-nav::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .admin-sidebar-nav::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .admin-sidebar-nav::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.24);
+      border-radius: 999px;
+    }
+
+    .admin-sidebar-nav::-webkit-scrollbar-thumb:hover {
+      background: rgba(255,255,255,0.36);
+    }
+
+    .admin-sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.72rem 0.8rem;
+      border-radius: 8px;
+      color: rgba(255,255,255,0.72);
+      font-size: 0.92rem;
+      font-weight: 700;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .admin-sidebar-link:hover,
+    .admin-sidebar-link.active {
+      background: rgba(162, 4, 5, 0.22);
+      color: #fff;
+    }
+
+    .admin-sidebar-link.active {
+      box-shadow: inset 3px 0 0 #a20405;
+    }
+
+    .admin-sidebar-logout {
+      margin: 0.7rem;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      color: #fecaca;
+      flex-shrink: 0;
+    }
+
+    .admin-sidebar-logout:hover {
+      background: rgba(239, 68, 68, 0.14);
+      color: #fff;
+    }
+
+    .admin-main {
+      min-height: 100vh;
+    }
+
+    .admin-main .dashboard-wrap {
+      max-width: none;
+      padding: 2rem 2.25rem 3rem;
+    }
+
+    .admin-main .admin-stats {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .admin-page-actions {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 900px) {
+      .admin-shell {
+        padding-left: 0;
+      }
+
+      .admin-sidebar {
+        position: static;
+        width: 100%;
+        height: auto;
+      }
+
+      .admin-sidebar-nav {
+        flex-direction: row;
+        overflow-x: auto;
+        overflow-y: hidden;
+      }
+
+      .admin-sidebar-link {
+        white-space: nowrap;
+      }
+
+      .admin-sidebar-logout {
+        margin-top: 0;
+      }
+
+      .admin-main .dashboard-wrap {
+        padding: 1.25rem 4% 2.5rem;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .admin-main .admin-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+  </style>
+
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <div class="admin-shell">
+    <aside class="admin-sidebar">
+      <a href="/admin" class="admin-sidebar-brand">
+        <img src="{{ url_for('static', filename='images/logo1.png') }}" alt="Shreeji Auto Services" />
+        <span class="admin-sidebar-name">
+          Shreeji
+          <span class="admin-sidebar-sub">Auto Services</span>
+        </span>
+      </a>
+
+      <nav class="admin-sidebar-nav" aria-label="Admin navigation">
+        <a href="/admin" class="admin-sidebar-link {% if request.path == '/admin' %}active{% endif %}">
+          <i class="fas fa-gauge-high"></i> Dashboard
+        </a>
+        <a href="/admin/checkin" class="admin-sidebar-link {% if request.path in ['/checkin', '/admin/checkin'] %}active{% endif %}">
+          <i class="fas fa-circle-check"></i> Check-In
+        </a>
+        <a href="/admin/slots" class="admin-sidebar-link {% if request.path.startswith('/admin/slots') %}active{% endif %}">
+          <i class="fas fa-calendar-days"></i> Slot Management
+        </a>
+        <a href="/admin/bookings" class="admin-sidebar-link {% if request.path.startswith('/admin/bookings') %}active{% endif %}">
+          <i class="fas fa-clipboard-list"></i> Booking Requests
+        </a>
+        <a href="/admin/service-reminders" class="admin-sidebar-link {% if request.path.startswith('/admin/service-reminders') %}active{% endif %}">
+          <i class="fas fa-bell"></i> Service Reminder
+        </a>
+        <a href="/admin/walkin" class="admin-sidebar-link {% if request.path.startswith('/admin/walkin') %}active{% endif %}">
+          <i class="fas fa-motorcycle"></i> Walk-in Entry
+        </a>
+        <a href="/admin/export" class="admin-sidebar-link {% if request.path.startswith('/admin/export') %}active{% endif %}">
+          <i class="fas fa-file-export"></i> Export Data
+        </a>
+        <a href="/admin/salary/workers" class="admin-sidebar-link {% if request.path.startswith('/admin/salary') and not request.path.startswith('/admin/salary/history') %}active{% endif %}">
+          <i class="fas fa-users"></i> Workers
+        </a>
+        <a href="/admin/salary/history" class="admin-sidebar-link {% if request.path.startswith('/admin/salary/history') %}active{% endif %}">
+          <i class="fas fa-history"></i> Salary History
+        </a>
+        <a href="/admin/salary/advances" class="admin-sidebar-link {% if request.path.startswith('/admin/salary/advances') %}active{% endif %}">
+          <i class="fas fa-hand-holding-dollar"></i> Worker Advances
+        </a>
+        <a href="/admin/attendance" class="admin-sidebar-link {% if request.path.startswith('/admin/attendance') %}active{% endif %}">
+          <i class="fas fa-clipboard-check"></i> Attendance
+        </a>
+        <a href="/admin/attendance/history" class="admin-sidebar-link {% if request.path.startswith('/admin/attendance/history') %}active{% endif %}">
+          <i class="fas fa-clock-rotate-left"></i> Attendance History
+        </a>
+      </nav>
+
+
+      <a href="/logout" class="admin-sidebar-link admin-sidebar-logout">
+        <i class="fas fa-sign-out-alt"></i> Logout
+      </a>
+    </aside>
+
+    <main class="admin-main">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <script>
+    function setLoading(button, isLoading = true) {
+      if (!button) {
+        return;
+      }
+
+      if (isLoading) {
+        if (!button.dataset.originalHtml) {
+          button.dataset.originalHtml = button.innerHTML;
+        }
+        button.disabled = true;
+        button.classList.add('is-loading');
+        button.innerText = button.dataset.loadingText || 'Processing...';
+      } else {
+        button.disabled = false;
+        button.classList.remove('is-loading');
+        if (button.dataset.originalHtml) {
+          button.innerHTML = button.dataset.originalHtml;
+        }
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('form').forEach((form) => {
+        form.addEventListener('submit', (event) => {
+          const submitter = event.submitter;
+          if (!submitter || !submitter.dataset.loadingSubmit) {
+            return;
+          }
+
+          setLoading(submitter, true);
+        });
+      });
+
+      document.addEventListener('click', (event) => {
+        const actionElement = event.target.closest('a[data-loading-text], a[data-toast-message]');
+        if (!actionElement || actionElement.tagName !== 'A') {
+          return;
+        }
+
+        setLoading(actionElement, true);
+
+        if (actionElement.target === '_blank') {
+          event.preventDefault();
+          window.open(actionElement.href, '_blank', 'noopener');
+          setTimeout(() => setLoading(actionElement, false), 1000);
+        }
+      });
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  {% block extra_scripts %}{% endblock %}
+
+
+  <style>
+    #toast-container {
+      z-index: 9999;
+    }
+    .toast-custom-enter {
+      animation: toastSlideIn 0.3s ease-out;
+    }
+    @keyframes toastSlideIn {
+      from { 
+        transform: translateX(100%); 
+        opacity: 0; 
+      }
+      to { 
+        transform: translateX(0); 
+        opacity: 1; 
+      }
+    }
+  </style>
+
+  <div id="toast-container" class="position-fixed end-0 top-0 p-3" style="z-index: 9999;">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          {% set bg_class = 'success' if category == 'success' else 'danger' if category == 'error' else 'warning' if category == 'warning' else 'primary' %}
+          <div class="toast align-items-center text-bg-{{ bg_class }} border-0 mb-2 fade show toast-custom-enter" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="4000" data-bs-autohide="true" style="min-width: 320px;">
+            <div class="d-flex">
+              <div class="toast-body">{{ message }}</div>
+              <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+  </div>
+
+
+  {% set pending_whatsapp = session.pop('pending_whatsapp_url', '') %}
+  {% if pending_whatsapp %}
+  <input type="hidden" id="pending-whatsapp-url" value="{{ pending_whatsapp }}">
+  {% endif %}
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const toastEls = document.querySelectorAll('#toast-container .toast');
+      toastEls.forEach(function(toastEl) {
+        const toast = new bootstrap.Toast(toastEl);
+        toast.show();
+      });
+
+      const whatsappInput = document.getElementById('pending-whatsapp-url');
+      if (whatsappInput && whatsappInput.value) {
+        setTimeout(function() {
+          window.open(whatsappInput.value, '_blank');
+        }, 2000);
+      }
+    });
+  </script>
+
+
+</body>
+</html>
