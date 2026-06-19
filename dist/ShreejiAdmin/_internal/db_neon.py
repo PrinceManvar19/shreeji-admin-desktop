@@ -1,11 +1,17 @@
 import json
 import os
+import threading
 from pathlib import Path
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
 from flask import current_app, g
+
+db_ready = False
+db_error = None
+_db_init_thread = None
+_db_init_lock = threading.Lock()
 
 
 def clean_database_url(database_url):
@@ -229,22 +235,25 @@ def _mark_migrations_done(cursor, db):
 
 
 def init_neon_db():
+    global db_ready
+
     db = get_neon_db()
 
     cursor = db.cursor(cursor_factory=RealDictCursor)
 
     try:
         _create_tables(cursor, db)
+        migrate_bookings_table(cursor, db)
+        migrate_customers_table(cursor, db)
+        migrate_customer_vehicles(cursor, db)
 
         if not _migrations_already_done(cursor, db):
-            migrate_bookings_table(cursor, db)
-            migrate_customers_table(cursor, db)
             migrate_vehicles(cursor, db)
-            migrate_customer_vehicles(cursor, db)
             migrate_json_data(cursor, db)
             _mark_migrations_done(cursor, db)
 
         seed_admins(cursor, db)
+        db_ready = True
 
     except psycopg2.Error as e:
         db.rollback()
@@ -252,6 +261,43 @@ def init_neon_db():
 
     finally:
         cursor.close()
+
+
+def _run_background_init(app):
+    global db_error, db_ready
+
+    db_ready = False
+    db_error = None
+
+    try:
+        with app.app_context():
+            init_neon_db()
+        print("Neon database startup check completed.", flush=True)
+
+    except Exception as error:
+        db_ready = False
+        db_error = error
+        print(
+            f"WARNING: Neon database startup check failed: {error}",
+            flush=True,
+        )
+
+
+def start_background_init(app):
+    global _db_init_thread
+
+    with _db_init_lock:
+        if _db_init_thread and _db_init_thread.is_alive():
+            return _db_init_thread
+
+        _db_init_thread = threading.Thread(
+            target=_run_background_init,
+            args=(app,),
+            name="neon-db-startup",
+            daemon=True,
+        )
+        _db_init_thread.start()
+        return _db_init_thread
 
 
 def seed_admins(cursor, db):
@@ -400,32 +446,36 @@ def migrate_bookings_table(cursor, db):
         "msg_completed_sent"
     ]
 
-    columns_to_add = []
-
-    for col in [
-        "whatsapp_sent",
+    text_columns = [
+        "customer_id",
+        "phone",
+        "brand_model",
+        "created_at",
+        "checked_in_at",
+        "completed_at",
         "actual_visit_date",
-        "is_rescheduled",
         "reminder_sent_at",
         "reminder_snooze_until",
-        "service_reminder_sent"
-    ] + message_flags:
+    ]
+    integer_columns = [
+        "whatsapp_sent",
+        "is_rescheduled",
+        "service_reminder_sent",
+        *message_flags,
+    ]
+    columns_to_add = []
 
+    for col in text_columns + integer_columns:
         if col not in existing_columns:
             columns_to_add.append(col)
 
     for col in columns_to_add:
-        if col in ("actual_visit_date", "reminder_sent_at", "reminder_snooze_until"):
-            cursor.execute(
-                "ALTER TABLE bookings ADD COLUMN actual_visit_date TEXT"
-                if col == "actual_visit_date"
-                else f"ALTER TABLE bookings ADD COLUMN {col} TEXT"
-            )
-
-        else:
+        if col in integer_columns:
             cursor.execute(
                 f"ALTER TABLE bookings ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0"
             )
+        else:
+            cursor.execute(f"ALTER TABLE bookings ADD COLUMN {col} TEXT")
 
     if "source" not in existing_columns:
         cursor.execute("ALTER TABLE bookings ADD COLUMN source TEXT DEFAULT 'customer_portal'")
@@ -515,6 +565,3 @@ def migrate_customer_vehicles(cursor, db):
 
 def init_app(app):
     app.teardown_appcontext(close_neon_db)
-
-    with app.app_context():
-        init_neon_db()

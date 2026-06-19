@@ -1,4 +1,4 @@
-from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
 
 from models.customer_model import create_customer, find_customer
 from services.auth_service import login_user_by_identifier, set_user_session
@@ -20,7 +20,11 @@ def login():
                 flash("Login successful!", "success")
 
                 if user["role"] == "admin":
-                    return redirect("/admin")
+                    if "admin.admin" not in current_app.view_functions:
+                        session.clear()
+                        flash("Admin access is available in the desktop admin panel.", "error")
+                        return redirect(url_for("auth.login"))
+                    return redirect(url_for("admin.admin"))
                 return redirect(url_for("customer.dashboard"))
 
         except Exception as error:

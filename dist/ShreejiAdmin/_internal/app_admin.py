@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 from flask import Flask, jsonify
 
-from db_neon import init_app as init_db_app
+import db_neon
 from db_local import init_local_db
 from routes.admin_attendance_routes import att_bp
 from routes.admin_routes import admin_bp
@@ -108,6 +108,9 @@ def create_app():
         "SECRET_KEY",
         "shreeji-auto-key-2025",
     )
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["SESSION_COOKIE_SECURE"] = False
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
 
     app.config["UPLOAD_FOLDER"] = "static/uploads"
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
@@ -127,17 +130,7 @@ def create_app():
 
     app.config["DATABASE_URL"] = database_url
 
-    try:
-        init_db_app(app)
-    except Exception as error:
-        message = (
-            "Database initialization failed. Verify DATABASE_URL points to a "
-            f"reachable PostgreSQL database. Error: {error}"
-        )
-        print(f"STARTUP CONFIGURATION ERROR: {message}", flush=True)
-        app.config["STARTUP_CONFIG_ERROR"] = message
-        register_configuration_error_routes(app, message)
-        return app
+    db_neon.init_app(app)
 
     @app.before_request
     def sync_session_user():
@@ -155,6 +148,8 @@ def create_app():
             "status": "ok",
             "environment": environment,
             "database_url_found": True,
+            "db_ready": db_neon.db_ready,
+            "db_error": str(db_neon.db_error) if db_neon.db_error else "",
             "local_db": "initialised",
             "mode": "admin",
             "message": "Garage Management System Running",

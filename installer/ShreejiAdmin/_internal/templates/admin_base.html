@@ -197,7 +197,7 @@
 <body>
   <div class="admin-shell">
     <aside class="admin-sidebar">
-      <a href="/admin" class="admin-sidebar-brand">
+      <a href="{{ url_for('admin.admin') }}" class="admin-sidebar-brand">
         <img src="{{ url_for('static', filename='images/logo1.png') }}" alt="Shreeji Auto Services" />
         <span class="admin-sidebar-name">
           Shreeji
@@ -206,46 +206,46 @@
       </a>
 
       <nav class="admin-sidebar-nav" aria-label="Admin navigation">
-        <a href="/admin" class="admin-sidebar-link {% if request.path == '/admin' %}active{% endif %}">
+        <a href="{{ url_for('admin.admin') }}" class="admin-sidebar-link {% if request.endpoint == 'admin.admin' %}active{% endif %}">
           <i class="fas fa-gauge-high"></i> Dashboard
         </a>
-        <a href="/admin/checkin" class="admin-sidebar-link {% if request.path in ['/checkin', '/admin/checkin'] %}active{% endif %}">
+        <a href="{{ url_for('admin.admin_checkin_page') }}" class="admin-sidebar-link {% if request.path.startswith(url_for('admin.admin_checkin_page')) %}active{% endif %}">
           <i class="fas fa-circle-check"></i> Check-In
         </a>
-        <a href="/admin/slots" class="admin-sidebar-link {% if request.path.startswith('/admin/slots') %}active{% endif %}">
+        <a href="{{ url_for('admin.admin_slots') }}" class="admin-sidebar-link {% if request.path.startswith(url_for('admin.admin_slots')) %}active{% endif %}">
           <i class="fas fa-calendar-days"></i> Slot Management
         </a>
-        <a href="/admin/bookings" class="admin-sidebar-link {% if request.path.startswith('/admin/bookings') %}active{% endif %}">
+        <a href="{{ url_for('admin.admin_bookings') }}" class="admin-sidebar-link {% if request.path.startswith(url_for('admin.admin_bookings')) %}active{% endif %}">
           <i class="fas fa-clipboard-list"></i> Booking Requests
         </a>
-        <a href="/admin/service-reminders" class="admin-sidebar-link {% if request.path.startswith('/admin/service-reminders') %}active{% endif %}">
+        <a href="{{ url_for('admin.service_reminders') }}" class="admin-sidebar-link {% if request.path.startswith(url_for('admin.service_reminders')) %}active{% endif %}">
           <i class="fas fa-bell"></i> Service Reminder
         </a>
-        <a href="/admin/walkin" class="admin-sidebar-link {% if request.path.startswith('/admin/walkin') %}active{% endif %}">
+        <a href="{{ url_for('admin.admin_walkin') }}" class="admin-sidebar-link {% if request.path.startswith(url_for('admin.admin_walkin')) %}active{% endif %}">
           <i class="fas fa-motorcycle"></i> Walk-in Entry
         </a>
-        <a href="/admin/export" class="admin-sidebar-link {% if request.path.startswith('/admin/export') %}active{% endif %}">
+        <a href="{{ url_for('admin.admin_export') }}" class="admin-sidebar-link {% if request.path.startswith(url_for('admin.admin_export')) %}active{% endif %}">
           <i class="fas fa-file-export"></i> Export Data
         </a>
-        <a href="/admin/salary/workers" class="admin-sidebar-link {% if request.path.startswith('/admin/salary') and not request.path.startswith('/admin/salary/history') %}active{% endif %}">
+        <a href="{{ url_for('salary.workers') }}" class="admin-sidebar-link {% if request.path.startswith(url_for('salary.workers')) %}active{% endif %}">
           <i class="fas fa-users"></i> Workers
         </a>
-        <a href="/admin/salary/history" class="admin-sidebar-link {% if request.path.startswith('/admin/salary/history') %}active{% endif %}">
+        <a href="{{ url_for('salary.salary_history') }}" class="admin-sidebar-link {% if request.path.startswith(url_for('salary.salary_history')) %}active{% endif %}">
           <i class="fas fa-history"></i> Salary History
         </a>
-        <a href="/admin/salary/advances" class="admin-sidebar-link {% if request.path.startswith('/admin/salary/advances') %}active{% endif %}">
+        <a href="{{ url_for('salary.worker_advances') }}" class="admin-sidebar-link {% if request.path.startswith(url_for('salary.worker_advances')) %}active{% endif %}">
           <i class="fas fa-hand-holding-dollar"></i> Worker Advances
         </a>
-        <a href="/admin/attendance" class="admin-sidebar-link {% if request.path.startswith('/admin/attendance') %}active{% endif %}">
+        <a href="{{ url_for('attendance.attendance_page') }}" class="admin-sidebar-link {% if request.endpoint == 'attendance.attendance_page' %}active{% endif %}">
           <i class="fas fa-clipboard-check"></i> Attendance
         </a>
-        <a href="/admin/attendance/history" class="admin-sidebar-link {% if request.path.startswith('/admin/attendance/history') %}active{% endif %}">
+        <a href="{{ url_for('attendance.attendance_history') }}" class="admin-sidebar-link {% if request.path.startswith(url_for('attendance.attendance_history')) %}active{% endif %}">
           <i class="fas fa-clock-rotate-left"></i> Attendance History
         </a>
       </nav>
 
 
-      <a href="/logout" class="admin-sidebar-link admin-sidebar-logout">
+      <a href="{{ url_for('auth.logout') }}" class="admin-sidebar-link admin-sidebar-logout">
         <i class="fas fa-sign-out-alt"></i> Logout
       </a>
     </aside>
@@ -256,6 +256,44 @@
   </div>
 
   <script>
+    function openWhatsApp(url) {
+      if (!url) {
+        return;
+      }
+
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.open_external) {
+        window.pywebview.api.open_external(url);
+        return;
+      }
+
+      window.open(url, '_blank', 'noopener');
+    }
+
+    async function openWhatsAppFromRoute(routeUrl, actionElement) {
+      if (!routeUrl) {
+        return;
+      }
+
+      setLoading(actionElement, true);
+
+      try {
+        const response = await fetch(routeUrl, {
+          headers: { 'Accept': 'application/json' }
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.whatsapp_url) {
+          throw new Error(data.error || 'WhatsApp message could not be opened.');
+        }
+
+        openWhatsApp(data.whatsapp_url);
+      } catch (error) {
+        alert(error.message || 'WhatsApp message could not be opened.');
+      } finally {
+        setLoading(actionElement, false);
+      }
+    }
+
     function setLoading(button, isLoading = true) {
       if (!button) {
         return;
@@ -290,6 +328,20 @@
       });
 
       document.addEventListener('click', (event) => {
+        const whatsappRouteElement = event.target.closest('[data-whatsapp-route]');
+        if (whatsappRouteElement) {
+          event.preventDefault();
+          openWhatsAppFromRoute(whatsappRouteElement.dataset.whatsappRoute, whatsappRouteElement);
+          return;
+        }
+
+        const whatsappUrlElement = event.target.closest('[data-whatsapp-url]');
+        if (whatsappUrlElement) {
+          event.preventDefault();
+          openWhatsApp(whatsappUrlElement.dataset.whatsappUrl);
+          return;
+        }
+
         const actionElement = event.target.closest('a[data-loading-text], a[data-toast-message]');
         if (!actionElement || actionElement.tagName !== 'A') {
           return;
@@ -344,11 +396,6 @@
     {% endwith %}
   </div>
 
-
-  {% set pending_whatsapp = session.pop('pending_whatsapp_url', '') %}
-  {% if pending_whatsapp %}
-  <input type="hidden" id="pending-whatsapp-url" value="{{ pending_whatsapp }}">
-  {% endif %}
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       const toastEls = document.querySelectorAll('#toast-container .toast');
@@ -356,13 +403,6 @@
         const toast = new bootstrap.Toast(toastEl);
         toast.show();
       });
-
-      const whatsappInput = document.getElementById('pending-whatsapp-url');
-      if (whatsappInput && whatsappInput.value) {
-        setTimeout(function() {
-          window.open(whatsappInput.value, '_blank');
-        }, 2000);
-      }
     });
   </script>
 

@@ -1,8 +1,9 @@
 from datetime import datetime
 
-from db_neon import get_neon_db as get_db
+from db_neon import get_neon_db as get_db, query_dict
 from models.booking_model import count_bookings_for_slot
-from models.slot_model import get_slot, get_slots_map, update_slot_total
+from models.slot_model import get_slot, update_slot_total
+from utils.constants import ACTIVE_SLOT_STATUSES
 from utils.helpers import get_next_days
 
 
@@ -55,16 +56,31 @@ def has_available_slot(date):
 
 
 def get_slots_for_admin():
-    slots = {}
-    for date, slot in get_slots_map().items():
-        slot_info = _build_slot_info({"date": date, "total": slot["total"]})
-        if slot_info:
-            slots[date] = {
-                "total": slot_info["total"],
-                "booked": slot_info["booked"],
-                "available": slot_info["available"],
-            }
-    return slots
+    placeholders = ", ".join(["%s"] * len(ACTIVE_SLOT_STATUSES))
+    rows = query_dict(
+        f"""
+        SELECT
+            s.date,
+            s.total,
+            COUNT(b.booking_id) AS booked
+        FROM slots s
+        LEFT JOIN bookings b
+          ON b.date = s.date
+         AND b.status IN ({placeholders})
+        GROUP BY s.date, s.total
+        ORDER BY s.date DESC
+        """,
+        ACTIVE_SLOT_STATUSES,
+    )
+
+    return {
+        row["date"]: {
+            "total": row["total"],
+            "booked": int(row["booked"] or 0),
+            "available": max(0, row["total"] - int(row["booked"] or 0)),
+        }
+        for row in rows
+    }
 
 
 def get_slot_availability(date):

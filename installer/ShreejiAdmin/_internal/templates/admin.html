@@ -260,13 +260,14 @@
                   "Your vehicle service is completed. You may collect your vehicle.\n\n" ~
                   "Thank you - Shreeji Auto Services"
                   %}
-                  <a target="_blank"
+                  <a href="#"
                      class="btn btn-success btn-sm"
                      data-whatsapp-button="true"
                      data-booking-id="{{ booking.booking_id }}"
                      data-action="completed"
+                     data-whatsapp-url="https://wa.me/{{ '91' ~ booking.phone }}?text={{ message|urlencode }}"
                      style="display:none;"
-                     href="https://wa.me/{{ '91' ~ booking.phone }}?text={{ message|urlencode }}">
+                     onclick="openWhatsApp(this.dataset.whatsappUrl); return false;">
                     Send WhatsApp
                   </a>
                 {% endif %}
@@ -345,15 +346,16 @@
             "We will notify you once ready.%0A%0A" ~
             "- Shreeji Auto Services"
             %}
-            <a target="_blank"
+            <a href="#"
                class="btn btn-success btn-sm"
                data-whatsapp-button="true"
                data-booking-id="{{ booking.booking_id }}"
                data-action="checked_in"
                data-loading-text="Sending..."
                data-toast-message="WhatsApp opened"
+               data-whatsapp-url="https://wa.me/{{ '91' ~ booking.phone }}?text={{ message }}"
                style="display:none;margin-top:1rem;"
-               href="https://wa.me/{{ '91' ~ booking.phone }}?text={{ message }}">
+               onclick="openWhatsApp(this.dataset.whatsappUrl); return false;">
               WhatsApp
             </a>
           {% endif %}
@@ -476,7 +478,7 @@
       
       if (data.success) {
         if (data.whatsapp_url) {
-          window.open(data.whatsapp_url, '_blank');
+          openWhatsApp(data.whatsapp_url);
         }
 
         if (action === 'reschedule-checkin') {

@@ -27,7 +27,7 @@
       <button type="button" class="admin-quick-filter quick-filter-chip" data-filter="checked_in" onclick="setFilter('checked_in')">In Garage</button>
     </div>
 
-    <form method="GET" action="/admin/bookings" class="dash-form" style="margin-bottom:1.25rem;">
+    <form method="GET" action="{{ url_for('admin.admin_bookings') }}" class="dash-form" style="margin-bottom:1.25rem;">
       <div style="display:flex; gap:1rem; align-items:flex-end; flex-wrap:wrap;">
         <div style="flex:1; min-width:180px;">
           <label>Filter by Date</label>
@@ -48,7 +48,7 @@
           <button type="submit" id="apply-btn" class="dash-btn-primary">
             <i class="fas fa-search"></i> Apply
           </button>
-          <a href="/admin/bookings" class="dash-btn-secondary">
+          <a href="{{ url_for('admin.admin_bookings') }}" class="dash-btn-secondary">
             <i class="fas fa-rotate-left"></i> Reset
           </a>
         </div>
@@ -114,7 +114,7 @@
               </td>
               <td class="action-col">
                 {% if b.status == 'approved' %}
-                  <a href="/admin/checkin/{{ b.booking_id }}"
+                  <a href="{{ url_for('admin.admin_checkin_booking', booking_id=b.booking_id) }}"
                      class="btn btn-primary btn-sm action-btn-compact loading-btn"
                      data-loading-text="Checking In...">
                     Check-In
@@ -128,10 +128,9 @@
               <td class="action-col">
                 <div class="whatsapp-cell">
                   {% if b.phone %}
-                    <a href="/admin/whatsapp/{{ b.booking_id }}"
-                       target="_blank"
-                       rel="noopener"
+                    <a href="#"
                        class="btn btn-sm action-btn-compact {% if b.whatsapp_sent %}btn-outline-primary{% else %}btn-success{% endif %}"
+                       data-whatsapp-route="{{ url_for('admin.send_booking_whatsapp', booking_id=b.booking_id) }}"
                        data-loading-text="Sending..."
                        data-toast-message="Message sent"
                        title="Send or resend WhatsApp message"
@@ -196,6 +195,8 @@
 <script>
   let activeBookingRow = null;
   let currentFilter = 'all';
+  const approveUrlTemplate = "{{ url_for('admin.approve_booking', booking_id='__BOOKING_ID__') }}";
+  const rejectUrlTemplate = "{{ url_for('admin.reject_booking', booking_id='__BOOKING_ID__') }}";
 
   function openBookingModal(row) {
     const backdrop = document.getElementById('bookingModalBackdrop');
@@ -225,9 +226,11 @@
     message.textContent = '';
 
     if (status === 'pending') {
+      const approveUrl = approveUrlTemplate.replace('__BOOKING_ID__', encodeURIComponent(bookingId));
+      const rejectUrl = rejectUrlTemplate.replace('__BOOKING_ID__', encodeURIComponent(bookingId));
       actions.innerHTML =
-        '<a href="/admin/approve/' + bookingId + '" class="dash-btn-primary loading-btn" data-loading-text="Approving..." data-toast="Booking Approved">Approve</a>' +
-        '<a href="/admin/reject/' + bookingId + '" class="dash-btn-secondary booking-modal-danger loading-btn" data-loading-text="Rejecting..." data-toast="Booking Rejected" onclick="return confirm(\'Reject this booking? This cannot be undone.\')">Reject</a>';
+        '<a href="' + approveUrl + '" class="dash-btn-primary loading-btn" data-loading-text="Approving..." data-toast="Booking Approved">Approve</a>' +
+        '<a href="' + rejectUrl + '" class="dash-btn-secondary booking-modal-danger loading-btn" data-loading-text="Rejecting..." data-toast="Booking Rejected" onclick="return confirm(\'Reject this booking? This cannot be undone.\')">Reject</a>';
     } else if (status === 'approved') {
       message.hidden = false;
       message.textContent = 'Use the Check-In column when the vehicle arrives.';

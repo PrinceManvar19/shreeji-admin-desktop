@@ -21,8 +21,6 @@ from services.booking_service import (
     get_admin_bookings,
     get_booking_by_id,
     get_booking_stats,
-    get_today_bookings,
-    get_today_stats,
 )
 from services.service_reminder_service import (
     build_whatsapp_url_for_reminder,
@@ -85,8 +83,11 @@ def admin():
     completed_count = stats.get('completed', 0)
     
     # Today control panel data
-    today_bookings = get_today_bookings(today)
-    today_stats = get_today_stats(today)
+    today_bookings = [
+        b for b in bookings
+        if b.get("date") == today or b.get("actual_visit_date") == today
+    ]
+    today_stats = get_booking_stats(today_bookings)
     service_due_count = due_reminder_count()
     
     # Garage vehicles (checked_in)
@@ -139,18 +140,15 @@ def admin_checkin_page():
     
     today = get_today_date_string()
     
-    # Today's queue
-    queue_filters = {
-        "date": today,
-        "status": STATUS_APPROVED
-    }
-    today_queue = get_admin_bookings(queue_filters)
-    
-    # Garage vehicles
-    garage_filters = {
-        "status": STATUS_CHECKED_IN
-    }
-    vehicles_in_garage = get_admin_bookings(garage_filters)
+    all_relevant = get_admin_bookings({"status": ""})
+    today_queue = [
+        b for b in all_relevant
+        if b.get("date") == today and b.get("status") == STATUS_APPROVED
+    ]
+    vehicles_in_garage = [
+        b for b in all_relevant
+        if b.get("status") == STATUS_CHECKED_IN
+    ]
     
     # Verify booking
     booking_data = None
@@ -234,15 +232,14 @@ def service_reminders():
 def service_reminder_whatsapp(booking_id):
     admin_guard = _require_admin()
     if admin_guard is not None:
-        return admin_guard
+        return jsonify({"error": "Admin access required"}), 403
 
     whatsapp_url = build_whatsapp_url_for_reminder(booking_id)
     if not whatsapp_url:
-        flash("WhatsApp reminder could not be opened for this booking.", "error")
-        return redirect(url_for("admin.service_reminders"))
+        return jsonify({"error": "WhatsApp reminder could not be opened."}), 400
 
     mark_reminder_sent(booking_id)
-    return redirect(whatsapp_url)
+    return jsonify({"whatsapp_url": whatsapp_url})
 
 
 @admin_bp.route("/service-reminders/<booking_id>/mark-sent", methods=["POST"])
@@ -430,18 +427,16 @@ def complete_booking(booking_id):
 def send_booking_whatsapp(booking_id):
     admin_guard = _require_admin()
     if admin_guard is not None:
-        return admin_guard
+        return jsonify({"error": "Admin access required"}), 403
 
     booking = get_booking_by_id(booking_id)
     if not booking:
-        flash("Booking not found", "error")
-        return redirect(url_for("admin.admin_bookings"))
+        return jsonify({"error": "Booking not found"}), 404
 
-    fallback = redirect(url_for("admin.admin_bookings"))
-    response = _redirect_with_whatsapp(booking_id, booking, fallback)
-    if response is fallback:
-        flash("No WhatsApp message is pending for this booking.", "error")
-    return response
+    whatsapp_url = _get_whatsapp_url(booking_id, booking)
+    if not whatsapp_url:
+        return jsonify({"error": "No WhatsApp message is pending for this booking."}), 400
+    return jsonify({"whatsapp_url": whatsapp_url})
 
 
 @admin_bp.route("/find-customer")
@@ -733,9 +728,12 @@ def _get_whatsapp_url(booking_id, booking):
 
 def _redirect_with_whatsapp(booking_id, booking, fallback_response):
     whatsapp_url = _get_whatsapp_url(booking_id, booking)
+    if request.headers.get("Accept", "").find("application/json") >= 0:
+        return jsonify({"whatsapp_url": whatsapp_url})
     if not whatsapp_url:
         return fallback_response
-    return redirect(whatsapp_url)
+    flash("WhatsApp message is ready to send.", "success")
+    return fallback_response
 
 
 def _csv_response(filename, headers, rows):

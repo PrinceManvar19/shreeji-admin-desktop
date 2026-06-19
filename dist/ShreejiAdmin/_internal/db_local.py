@@ -7,6 +7,108 @@ DATA_DIR = PROJECT_ROOT / "data"
 DB_PATH = DATA_DIR / "garage.db"
 
 
+CURRENT_SCHEMA = """
+CREATE TABLE IF NOT EXISTS admins (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    phone TEXT,
+    password_hash TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS workers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    phone TEXT UNIQUE,
+    monthly_salary REAL NOT NULL DEFAULT 0,
+    worker_status TEXT NOT NULL DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS attendance_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    worker_id TEXT NOT NULL,
+    date TEXT NOT NULL,
+    status TEXT NOT NULL,
+    check_in_time TEXT,
+    check_out_time TEXT,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (worker_id, date),
+    FOREIGN KEY (worker_id) REFERENCES workers (id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS salary_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    worker_id TEXT NOT NULL,
+    month TEXT NOT NULL,
+    year INTEGER NOT NULL,
+    total_days INTEGER NOT NULL DEFAULT 0,
+    attended_days REAL NOT NULL DEFAULT 0,
+    per_day_salary REAL DEFAULT 0,
+    base_salary REAL DEFAULT 0,
+    bonus REAL DEFAULT 0,
+    overtime REAL DEFAULT 0,
+    commission REAL DEFAULT 0,
+    gross_salary REAL DEFAULT 0,
+    pocket_money_deduction REAL DEFAULT 0,
+    monthly_advance_entry_count INTEGER DEFAULT 0,
+    previous_pending_debt REAL DEFAULT 0,
+    debt_recovery_deduction REAL DEFAULT 0,
+    extra_salary REAL DEFAULT 0,
+    remaining_debt_balance REAL DEFAULT 0,
+    final_payable_salary REAL DEFAULT 0,
+    net_salary REAL DEFAULT 0,
+    total_salary REAL DEFAULT 0,
+    salary_status TEXT NOT NULL DEFAULT 'finalized',
+    payment_status TEXT DEFAULT 'pending',
+    payment_method TEXT,
+    paid_at TEXT,
+    updated_at TEXT,
+    pdf_path TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (worker_id, month, year),
+    FOREIGN KEY (worker_id) REFERENCES workers (id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS pocket_money_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    worker_id TEXT NOT NULL,
+    amount REAL NOT NULL,
+    entry_date TEXT NOT NULL DEFAULT (date('now')),
+    note TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (worker_id) REFERENCES workers (id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS worker_debts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    worker_id TEXT NOT NULL,
+    debt_amount REAL NOT NULL,
+    debt_date TEXT NOT NULL DEFAULT (date('now')),
+    reason TEXT,
+    remaining_balance REAL NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'open',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (worker_id) REFERENCES workers (id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS debt_recoveries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    debt_id INTEGER NOT NULL,
+    worker_id TEXT NOT NULL,
+    salary_record_id INTEGER,
+    recovery_amount REAL NOT NULL,
+    recovery_date TEXT NOT NULL DEFAULT (date('now')),
+    note TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (debt_id) REFERENCES worker_debts (id) ON DELETE CASCADE,
+    FOREIGN KEY (worker_id) REFERENCES workers (id) ON DELETE CASCADE,
+    FOREIGN KEY (salary_record_id) REFERENCES salary_records (id) ON DELETE SET NULL
+);
+"""
+
+
 def get_local_db():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
@@ -15,93 +117,99 @@ def get_local_db():
     return conn
 
 
+def _table_exists(conn, table_name):
+    row = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+        (table_name,),
+    ).fetchone()
+    return row is not None
+
+
+def _table_columns(conn, table_name):
+    if not _table_exists(conn, table_name):
+        return {}
+    return {row["name"]: dict(row) for row in conn.execute(f"PRAGMA table_info({table_name})")}
+
+
+def _table_count(conn, table_name):
+    if not _table_exists(conn, table_name):
+        return 0
+    return conn.execute(f"SELECT COUNT(*) AS count FROM {table_name}").fetchone()["count"]
+
+
+def _archive_table(conn, table_name):
+    if not _table_exists(conn, table_name):
+        return
+
+    suffix = 1
+    archive_name = f"{table_name}_legacy"
+    while _table_exists(conn, archive_name):
+        suffix += 1
+        archive_name = f"{table_name}_legacy_{suffix}"
+
+    if _table_count(conn, table_name) == 0:
+        conn.execute(f"DROP TABLE {table_name}")
+    else:
+        conn.execute(f"ALTER TABLE {table_name} RENAME TO {archive_name}")
+
+
+def _archive_incompatible_tables(conn):
+    admins = _table_columns(conn, "admins")
+    if admins and str(admins.get("id", {}).get("type", "")).upper() != "TEXT":
+        _archive_table(conn, "admins")
+
+    workers = _table_columns(conn, "workers")
+    if workers and (
+        str(workers.get("id", {}).get("type", "")).upper() != "TEXT"
+        or "monthly_salary" not in workers
+        or "worker_status" not in workers
+    ):
+        for table_name in (
+            "debt_recoveries",
+            "worker_debts",
+            "pocket_money_entries",
+            "salary_records",
+            "attendance_records",
+            "workers",
+        ):
+            _archive_table(conn, table_name)
+        return
+
+    required_columns = {
+        "salary_records": {"total_days", "attended_days", "total_salary", "salary_status", "final_payable_salary"},
+        "pocket_money_entries": {"entry_date", "note"},
+        "worker_debts": {"debt_amount", "remaining_balance", "status"},
+        "debt_recoveries": {"worker_id", "recovery_amount", "note"},
+    }
+    for table_name, columns in required_columns.items():
+        existing = set(_table_columns(conn, table_name))
+        if existing and not columns.issubset(existing):
+            _archive_table(conn, table_name)
+
+
+def _seed_default_admins(conn):
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO admins (id, name, phone)
+        VALUES (?, ?, ?)
+        """,
+        ("ADMIN001", "Owner", "9898135662"),
+    )
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO admins (id, name, phone)
+        VALUES (?, ?, ?)
+        """,
+        ("ADMIN002", "Manager", ""),
+    )
+
+
 def init_local_db():
-    # Only runs if tables don't exist — safe to call on every startup
     conn = get_local_db()
     try:
-        conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS admins (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                phone TEXT NOT NULL,
-                password_hash TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS workers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                phone TEXT UNIQUE,
-                role TEXT,
-                joining_date DATE,
-                is_active INTEGER DEFAULT 1,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS attendance_records (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                worker_id INTEGER NOT NULL,
-                date DATE NOT NULL,
-                status TEXT NOT NULL,
-                check_in_time TIME,
-                check_out_time TIME,
-                notes TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE (worker_id, date),
-                FOREIGN KEY (worker_id) REFERENCES workers (id)
-            );
-
-            CREATE TABLE IF NOT EXISTS salary_records (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                worker_id INTEGER NOT NULL,
-                month INTEGER NOT NULL,
-                year INTEGER NOT NULL,
-                base_salary REAL DEFAULT 0,
-                total_present INTEGER DEFAULT 0,
-                total_absent INTEGER DEFAULT 0,
-                deductions REAL DEFAULT 0,
-                bonus REAL DEFAULT 0,
-                net_salary REAL DEFAULT 0,
-                payment_status TEXT DEFAULT 'pending',
-                paid_at TIMESTAMP,
-                pdf_path TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (worker_id) REFERENCES workers (id)
-            );
-
-            CREATE TABLE IF NOT EXISTS pocket_money_entries (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                worker_id INTEGER NOT NULL,
-                amount REAL NOT NULL,
-                reason TEXT,
-                given_date DATE NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (worker_id) REFERENCES workers (id)
-            );
-
-            CREATE TABLE IF NOT EXISTS worker_debts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                worker_id INTEGER NOT NULL,
-                amount REAL NOT NULL,
-                reason TEXT,
-                debt_date DATE NOT NULL,
-                is_recovered INTEGER DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (worker_id) REFERENCES workers (id)
-            );
-
-            CREATE TABLE IF NOT EXISTS debt_recoveries (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                debt_id INTEGER NOT NULL,
-                amount REAL NOT NULL,
-                recovery_date DATE NOT NULL,
-                notes TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (debt_id) REFERENCES worker_debts (id)
-            );
-            """
-        )
+        _archive_incompatible_tables(conn)
+        conn.executescript(CURRENT_SCHEMA)
+        _seed_default_admins(conn)
         conn.commit()
     finally:
         conn.close()

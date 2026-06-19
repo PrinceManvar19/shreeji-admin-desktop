@@ -369,8 +369,9 @@ def get_admin_bookings(filters=None):
     ]
 
 
-def get_today_bookings(today_date):
-    customer_map = get_customer_map()
+def get_today_bookings(today_date, customer_map=None):
+    if customer_map is None:
+        customer_map = get_customer_map()
 
     return [
         enrich_booking(booking, customer_map)
@@ -482,10 +483,14 @@ def build_whatsapp_message(booking):
         return None, {}
 
     status = booking.get("status", "")
+    name = booking.get("name", "")
+    booking_id = booking.get("booking_id", "")
+
+    if not name or not booking_id:
+        return None, {}
 
     message = (
-        f"Hello {booking.get('name', '')}, "
-        f"your booking {booking.get('booking_id', '')} "
+        f"Hello {name}, your booking {booking_id} "
         f"status is now: {status.upper()}."
     )
 

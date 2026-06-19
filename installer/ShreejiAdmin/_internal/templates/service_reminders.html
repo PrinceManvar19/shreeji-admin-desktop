@@ -61,7 +61,10 @@
             <td><span class="badge-due"><i class="fas fa-circle"></i>{{ r.reminder_status }}</span></td>
             <td>
               <div class="actions">
-                <a class="btn-act btn-whatsapp" href="{{ url_for('admin.service_reminder_whatsapp', booking_id=r.booking_id) }}" target="_blank">
+                <a class="btn-act btn-whatsapp"
+                   href="#"
+                   data-whatsapp-route="{{ url_for('admin.service_reminder_whatsapp', booking_id=r.booking_id) }}"
+                   data-loading-text="Sending...">
                   <i class="fab fa-whatsapp"></i> Send WhatsApp
                 </a>
                 <form method="POST" action="{{ url_for('admin.service_reminder_mark_sent', booking_id=r.booking_id) }}">

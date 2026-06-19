@@ -9,7 +9,7 @@
       <h1 class="dash-title"><i class="fas fa-motorcycle"></i> Customer Check-In</h1>
       <p class="dash-sub">Verify approved bookings for today and add walk-in vehicles to the garage inline.</p>
     </div>
-    <a href="/admin" class="dash-btn-secondary">
+    <a href="{{ url_for('admin.admin') }}" class="dash-btn-secondary">
       <i class="fas fa-arrow-left"></i> Back to Admin
     </a>
   </div>
@@ -19,7 +19,7 @@
       <h2 class="dash-card-title"><i class="fas fa-id-card"></i> Verify Booking</h2>
       <p class="dash-sub">Today's date: {{ today_display or today }}</p>
 
-      <form method="POST" action="/checkin" class="dash-form">
+      <form method="POST" action="{{ url_for('admin.admin_checkin_verify') }}" class="dash-form">
         <input type="hidden" name="action" value="verify_booking" />
         <div class="dash-form-group">
           <label>Booking ID</label>
@@ -45,7 +45,7 @@
         </div>
 
         {% if verified_booking.status == 'approved' and verified_booking.date == today %}
-        <form method="POST" action="/checkin" style="margin-top:1rem;">
+        <form method="POST" action="{{ url_for('admin.admin_checkin_verify') }}" style="margin-top:1rem;">
           <input type="hidden" name="action" value="checkin_vehicle" />
           <input type="hidden" name="booking_id" value="{{ verified_booking.booking_id }}" />
           <button type="submit"
@@ -72,15 +72,16 @@
           "We will notify you once ready.%0A%0A" ~
           "- Shreeji Auto Services"
           %}
-          <a target="_blank"
+          <a href="#"
              class="btn btn-success btn-sm"
              data-whatsapp-button="true"
              data-booking-id="{{ booking.booking_id }}"
              data-action="checked_in"
              data-loading-text="Sending..."
              data-toast-message="WhatsApp opened"
+             data-whatsapp-url="https://wa.me/{{ '91' ~ booking.phone }}?text={{ message }}"
              style="display:none;margin-top:1rem;"
-             href="https://wa.me/{{ '91' ~ booking.phone }}?text={{ message }}">
+             onclick="openWhatsApp(this.dataset.whatsappUrl); return false;">
             WhatsApp
           </a>
         {% endif %}
@@ -91,7 +92,7 @@
     <div class="dash-card">
 <h2 class="dash-card-title"><i class="fas fa-user-plus"></i> Walk-in Customer (Manual Entry)</h2>
 
-      <form method="POST" action="/checkin" class="dash-form">
+      <form method="POST" action="{{ url_for('admin.admin_checkin_verify') }}" class="dash-form">
         <input type="hidden" name="action" value="manual_entry" />
         <div class="dash-form-row">
           <div class="dash-form-group">
@@ -195,9 +196,9 @@
 
     let url = '';
     if (custId) {
-      url = '/admin/find-customer-by-id?customer_id=' + encodeURIComponent(custId);
+      url = '{{ url_for('admin.find_customer_by_id') }}?customer_id=' + encodeURIComponent(custId);
     } else if (phone) {
-      url = '/admin/find-customer?phone=' + encodeURIComponent(phone);
+      url = '{{ url_for('admin.find_customer') }}?phone=' + encodeURIComponent(phone);
     } else {
       badge.innerHTML = '<span style="color:orange;">Enter a Customer ID or Phone number first.</span>';
       return;
@@ -273,7 +274,7 @@
 
   <div class="dash-card">
     <h2 class="dash-card-title">🔍 Find Booking by ID</h2>
-    <form method="POST" action="/admin/checkin/verify">
+    <form method="POST" action="{{ url_for('admin.admin_checkin_verify') }}">
       <div style="display:flex; gap:1rem; align-items:flex-end; flex-wrap:wrap;">
         <div style="flex:1; min-width:220px;">
           <label>Booking ID</label>
@@ -320,7 +321,7 @@
 
         <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; margin-top:1rem;">
           {% if booking.date == today and booking.status == 'approved' %}
-            <a href="/admin/checkin/{{ booking.booking_id }}"
+            <a href="{{ url_for('admin.admin_checkin_booking', booking_id=booking.booking_id) }}"
                class="btn btn-success btn-sm"
                data-whatsapp-trigger="true"
                data-booking-id="{{ booking.booking_id }}"
@@ -336,21 +337,22 @@
               "We will notify you once ready.%0A%0A" ~
               "- Shreeji Auto Services"
               %}
-              <a target="_blank"
+              <a href="#"
                  class="btn btn-success btn-sm"
                  data-whatsapp-button="true"
                  data-booking-id="{{ booking.booking_id }}"
                  data-action="checked_in"
                  data-loading-text="Sending..."
                  data-toast-message="WhatsApp opened"
+                 data-whatsapp-url="https://wa.me/{{ '91' ~ booking.phone }}?text={{ message }}"
                  style="display:none;"
-                 href="https://wa.me/{{ '91' ~ booking.phone }}?text={{ message }}">
+                 onclick="openWhatsApp(this.dataset.whatsappUrl); return false;">
                 WhatsApp
               </a>
             {% endif %}
           {% elif booking.status == 'checked_in' %}
             <span class="status-badge status-in_service">Already checked in</span>
-<a href="/admin/complete/{{ booking.booking_id }}"
+            <a href="{{ url_for('admin.complete_booking', booking_id=booking.booking_id) }}"
                class="btn btn-sm"
                style="background:#f59e0b;color:#fff;"
                data-loading-text="Completing..."
@@ -363,7 +365,7 @@
             <span class="status-badge status-rejected">Booking Rejected</span>
           {% elif booking.status == 'pending' %}
             <span class="status-badge status-pending">Not Approved Yet</span>
-            <a href="/admin/approve/{{ booking.booking_id }}"
+            <a href="{{ url_for('admin.approve_booking', booking_id=booking.booking_id) }}"
                class="btn btn-success btn-sm"
                data-loading-text="Approving...">
               Approve Now
@@ -407,7 +409,7 @@
               </td>
               <td>{{ b.service }}</td>
               <td>
-                <a href="/admin/checkin/{{ b.booking_id }}"
+                <a href="{{ url_for('admin.admin_checkin_booking', booking_id=b.booking_id) }}"
                    class="btn btn-primary btn-sm action-btn-compact"
                    data-loading-text="Checking In...">
                   Check In
@@ -468,17 +470,18 @@
                     "Your vehicle service is completed. You may collect your vehicle.\n\n" ~
                     "Thank you - Shreeji Auto Services"
                     %}
-                    <a target="_blank"
+                    <a href="#"
                        class="btn btn-success btn-sm"
                        data-whatsapp-button="true"
                        data-booking-id="{{ booking.booking_id }}"
                        data-action="completed"
+                       data-whatsapp-url="https://wa.me/{{ '91' ~ booking.phone }}?text={{ message|urlencode }}"
                        style="display:none;"
-                       href="https://wa.me/{{ '91' ~ booking.phone }}?text={{ message|urlencode }}">
+                       onclick="openWhatsApp(this.dataset.whatsappUrl); return false;">
                       Send WhatsApp
                     </a>
                   {% endif %}
-<a href="/admin/complete/{{ b.booking_id }}"
+                  <a href="{{ url_for('admin.complete_booking', booking_id=b.booking_id) }}"
                      class="btn btn-primary btn-sm action-btn-compact"
                      data-whatsapp-trigger="true"
                      data-booking-id="{{ b.booking_id }}"
