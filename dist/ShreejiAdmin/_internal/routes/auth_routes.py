@@ -22,8 +22,7 @@ def login():
                 if user["role"] == "admin":
                     if "admin.admin" not in current_app.view_functions:
                         session.clear()
-                        flash("Admin access is available in the desktop admin panel.", "error")
-                        return redirect(url_for("auth.login"))
+                        return redirect(url_for("auth.admin_info"))
                     return redirect(url_for("admin.admin"))
                 return redirect(url_for("customer.dashboard"))
 
@@ -33,6 +32,11 @@ def login():
         flash("Invalid credentials. Please check and try again.", "error")
 
     return render_template("login.html")
+
+
+@auth_bp.route("/admin-info")
+def admin_info():
+    return render_template("admin_info.html")
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])

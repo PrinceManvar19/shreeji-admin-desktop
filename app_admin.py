@@ -104,10 +104,7 @@ def create_app():
 
     app = Flask(__name__)
 
-    app.secret_key = os.environ.get(
-        "SECRET_KEY",
-        "shreeji-auto-key-2025",
-    )
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', os.urandom(24).hex())
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["SESSION_COOKIE_SECURE"] = False
     app.config["SESSION_COOKIE_HTTPONLY"] = True
@@ -166,5 +163,5 @@ if __name__ == "__main__":
     app.run(
         host="0.0.0.0",
         port=int(os.environ.get("PORT", 5050)),
-        debug=not is_railway_environment(),
+        debug=os.getenv("FLASK_DEBUG", "false").lower() == "true",
     )

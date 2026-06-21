@@ -45,7 +45,7 @@ def get_neon_db():
                 "Variables for the web service."
             )
 
-        connection = psycopg2.connect(database_url, connect_timeout=10)
+        connection = psycopg2.connect(database_url, connect_timeout=5)
         g.neon_db = connection
 
     return g.neon_db
@@ -301,14 +301,20 @@ def start_background_init(app):
 
 
 def seed_admins(cursor, db):
+    owner_phone = os.getenv("GARAGE_OWNER_PHONE", "").strip()
     cursor.execute("""
         INSERT INTO admins (id, name, phone)
         VALUES (%s, %s, %s)
-        ON CONFLICT (id) DO NOTHING
+        ON CONFLICT (id) DO UPDATE SET
+            name = EXCLUDED.name,
+            phone = CASE
+                WHEN EXCLUDED.phone <> '' THEN EXCLUDED.phone
+                ELSE admins.phone
+            END
     """, (
         "ADMIN001",
         "Owner",
-        "9898135662"
+        owner_phone
     ))
 
     cursor.execute("""

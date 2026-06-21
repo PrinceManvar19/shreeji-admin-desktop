@@ -236,7 +236,13 @@ class DesktopApp:
             self.port = find_free_port()
             self.start_flask_thread(flask_app)
             wait_for_server(self.port)
-            self.start_database_thread(flask_app)
+
+            db_thread = self.start_database_thread(flask_app)
+            db_thread.join(timeout=20)
+
+            from services.cache_sync import start_background_sync
+            start_background_sync(flask_app)
+
             self.server_ready.set()
             self.window.load_url(self.dashboard_url)
 

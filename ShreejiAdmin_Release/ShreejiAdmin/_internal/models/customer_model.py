@@ -105,6 +105,10 @@ def _get_vehicles_for_customer_id(customer_id):
     legacy_vehicle = (customer or {}).get("vehicle", "").strip().upper()
     if not legacy_vehicle:
         return []
+    log_action(
+        "VEHICLE_FALLBACK",
+        f"{customer_id} using legacy customers.vehicle {legacy_vehicle}",
+    )
     return [{"id": None, "number_plate": legacy_vehicle, "plate_number": legacy_vehicle, "brand_model": "", "brand": "", "model": "", "last_service_date": ""}]
 
 
@@ -288,11 +292,17 @@ def add_vehicle_to_customer(customer_id, plate_number, brand="", model=""):
     customer = get_customer_by_id(normalized_customer_id)
     if not customer:
         raise ValueError("Customer not found.")
-    db = get_db()
-    vehicle = _upsert_vehicle_record(db, normalized_customer_id, plate_number, brand, model)
-    add_customer_vehicle(normalized_customer_id, vehicle["plate_number"], f"{vehicle.get('brand', '')} {vehicle.get('model', '')}".strip())
-    db.commit()
-    return vehicle
+    normalized_plate = normalize_number_plate(plate_number)
+    normalized_brand = (brand or "").strip()
+    normalized_model = (model or "").strip()
+    brand_model = f"{normalized_brand} {normalized_model}".strip()
+    add_customer_vehicle(normalized_customer_id, normalized_plate, brand_model)
+    return {
+        "customer_id": normalized_customer_id,
+        "plate_number": normalized_plate,
+        "brand": normalized_brand,
+        "model": normalized_model,
+    }
 
 
 def _split_brand_model(brand_model):
@@ -489,3 +499,10 @@ def ensure_customer_by_phone(phone, name="Guest Customer"):
 def get_customer_map():
     rows = query_dict("SELECT id, name, phone, vehicle FROM customers")
     return {row["id"]: dict(row) for row in rows}
+
+
+def get_customer_map_local():
+    from db_local import local_query
+
+    rows = local_query("SELECT id, name, phone, vehicle FROM cache_customers")
+    return {row["id"]: row for row in rows}

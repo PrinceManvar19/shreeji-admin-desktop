@@ -7,15 +7,33 @@ from utils.helpers import log_action
 
 
 def _qdict(sql, params=()):
-    conn = get_db(); rows = conn.execute(sql, params).fetchall(); conn.close(); return [dict(r) for r in rows]
+    conn = get_db()
+    try:
+        rows = conn.execute(sql, params).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
 
 
 def _qone(sql, params=()):
-    conn = get_db(); row = conn.execute(sql, params).fetchone(); conn.close(); return dict(row) if row else None
+    conn = get_db()
+    try:
+        row = conn.execute(sql, params).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
 
 
 def _exec(sql, params=()):
-    conn = get_db(); conn.execute(sql, params); conn.commit(); conn.close()
+    conn = get_db()
+    try:
+        conn.execute(sql, params)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 VALID_STATUSES = {"present", "absent", "half_day", "leave", "holiday"}

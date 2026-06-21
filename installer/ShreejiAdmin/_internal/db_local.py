@@ -1,3 +1,4 @@
+import os
 import sqlite3
 from pathlib import Path
 
@@ -106,6 +107,44 @@ CREATE TABLE IF NOT EXISTS debt_recoveries (
     FOREIGN KEY (worker_id) REFERENCES workers (id) ON DELETE CASCADE,
     FOREIGN KEY (salary_record_id) REFERENCES salary_records (id) ON DELETE SET NULL
 );
+
+CREATE TABLE IF NOT EXISTS cache_bookings (
+    booking_id TEXT PRIMARY KEY,
+    customer_id TEXT,
+    name TEXT NOT NULL,
+    phone TEXT,
+    vehicle TEXT,
+    brand_model TEXT,
+    service TEXT,
+    date TEXT,
+    status TEXT,
+    created_at TEXT,
+    checked_in_at TEXT,
+    completed_at TEXT,
+    actual_visit_date TEXT,
+    is_rescheduled INTEGER DEFAULT 0,
+    whatsapp_sent INTEGER DEFAULT 0,
+    msg_approved_sent INTEGER DEFAULT 0,
+    msg_rejected_sent INTEGER DEFAULT 0,
+    msg_checkedin_sent INTEGER DEFAULT 0,
+    msg_completed_sent INTEGER DEFAULT 0,
+    service_reminder_sent INTEGER DEFAULT 0,
+    reminder_sent_at TEXT,
+    reminder_snooze_until TEXT,
+    source TEXT DEFAULT 'customer_portal'
+);
+
+CREATE TABLE IF NOT EXISTS cache_customers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    phone TEXT,
+    vehicle TEXT
+);
+
+CREATE TABLE IF NOT EXISTS cache_slots (
+    date TEXT PRIMARY KEY,
+    total INTEGER NOT NULL DEFAULT 0
+);
 """
 
 
@@ -187,13 +226,53 @@ def _archive_incompatible_tables(conn):
             _archive_table(conn, table_name)
 
 
+def _ensure_column(conn, table_name, column_name, definition):
+    columns = _table_columns(conn, table_name)
+    if not columns or column_name in columns:
+        return
+    conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
+
+
+def _upgrade_cache_tables(conn):
+    cache_booking_columns = {
+        "customer_id": "TEXT",
+        "phone": "TEXT",
+        "brand_model": "TEXT",
+        "checked_in_at": "TEXT",
+        "completed_at": "TEXT",
+        "actual_visit_date": "TEXT",
+        "is_rescheduled": "INTEGER DEFAULT 0",
+        "whatsapp_sent": "INTEGER DEFAULT 0",
+        "msg_approved_sent": "INTEGER DEFAULT 0",
+        "msg_rejected_sent": "INTEGER DEFAULT 0",
+        "msg_checkedin_sent": "INTEGER DEFAULT 0",
+        "msg_completed_sent": "INTEGER DEFAULT 0",
+        "service_reminder_sent": "INTEGER DEFAULT 0",
+        "reminder_sent_at": "TEXT",
+        "reminder_snooze_until": "TEXT",
+        "source": "TEXT DEFAULT 'customer_portal'",
+    }
+    for column_name, definition in cache_booking_columns.items():
+        _ensure_column(conn, "cache_bookings", column_name, definition)
+
+    _ensure_column(conn, "cache_customers", "vehicle", "TEXT")
+    _ensure_column(conn, "cache_slots", "total", "INTEGER NOT NULL DEFAULT 0")
+
+
 def _seed_default_admins(conn):
+    owner_phone = os.getenv("GARAGE_OWNER_PHONE", "").strip()
     conn.execute(
         """
-        INSERT OR IGNORE INTO admins (id, name, phone)
+        INSERT INTO admins (id, name, phone)
         VALUES (?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            name = excluded.name,
+            phone = CASE
+                WHEN excluded.phone != '' THEN excluded.phone
+                ELSE admins.phone
+            END
         """,
-        ("ADMIN001", "Owner", "9898135662"),
+        ("ADMIN001", "Owner", owner_phone),
     )
     conn.execute(
         """
@@ -209,6 +288,7 @@ def init_local_db():
     try:
         _archive_incompatible_tables(conn)
         conn.executescript(CURRENT_SCHEMA)
+        _upgrade_cache_tables(conn)
         _seed_default_admins(conn)
         conn.commit()
     finally:
@@ -218,3 +298,21 @@ def init_local_db():
 if __name__ == "__main__":
     init_local_db()
     print("Local database initialized successfully.")
+
+
+def local_query(sql, params=None):
+    conn = get_local_db()
+    try:
+        rows = conn.execute(sql, params or ()).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def local_query_one(sql, params=None):
+    conn = get_local_db()
+    try:
+        row = conn.execute(sql, params or ()).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()

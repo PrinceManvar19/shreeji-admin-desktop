@@ -49,19 +49,32 @@ def _pick(row, candidates):
     return ""
 
 
-def _next_customer_id_start(cursor):
+def _normalize_customer_id(value):
+    customer_id = (value or "").strip().upper()
+    return customer_id if re.fullmatch(r"CUST\d+", customer_id) else ""
+
+
+def _next_customer_id_start(cursor, imported_ids=None):
+    imported_ids = imported_ids or set()
     cursor.execute("SELECT id FROM customers WHERE id LIKE 'CUST%'")
     highest = 1000
     for row in cursor.fetchall():
         match = re.search(r"(\d+)$", row[0] or "")
         if match:
             highest = max(highest, int(match.group(1)))
+    for customer_id in imported_ids:
+        match = re.search(r"(\d+)$", customer_id or "")
+        if match:
+            highest = max(highest, int(match.group(1)))
     return highest + 1
 
 
-def _load_existing_customer_map(cursor):
-    cursor.execute("SELECT id, phone FROM customers WHERE phone IS NOT NULL AND phone <> ''")
-    return {row[1]: row[0] for row in cursor.fetchall()}
+def _load_existing_customer_maps(cursor):
+    cursor.execute("SELECT id, phone FROM customers")
+    rows = cursor.fetchall()
+    by_id = {row[0]: row[1] for row in rows}
+    by_phone = {row[1]: row[0] for row in rows if row[1]}
+    return by_id, by_phone
 
 
 def _load_existing_vehicle_plates(cursor):
@@ -108,48 +121,66 @@ def _ensure_tables(cursor):
 
 def import_customers(path, dry_run=False):
     rows = _load_rows(path)
-    db = get_db()
-    cursor = db.cursor()
     customers_seen = set()
     vehicles_seen = set()
     customer_rows = []
     customer_vehicle_rows = []
     legacy_vehicle_rows = []
     skipped = 0
+    imported_ids = {
+        customer_id
+        for row in rows
+        if (customer_id := _normalize_customer_id(_pick(row, ("customer id", "customer_id", "cust id", "id"))))
+    }
+
+    if dry_run:
+        for row in rows:
+            phone = normalize_phone(_pick(row, ("c_phone", "cphone", "phone", "mobile", "mobile no", "contact", "contact no", "phone number")))
+            plate = normalize_number_plate(_pick(row, ("vehi_num", "vehinum", "number plate", "vehicle number", "vehicle no", "registration number", "reg no", "plate")))
+            customer_id = _normalize_customer_id(_pick(row, ("customer id", "customer_id", "cust id", "id")))
+
+            if len(phone) != 10 or not plate:
+                skipped += 1
+                continue
+
+            customers_seen.add(customer_id or phone)
+            vehicles_seen.add(plate)
+
+        print(f"Dry run - Customers parsed: {len(customers_seen)}")
+        print(f"Dry run - Vehicles parsed: {len(vehicles_seen)}")
+        print(f"Rows skipped: {skipped}")
+        return
+
+    db = get_db()
+    cursor = db.cursor()
 
     try:
-        id_counter = None
-        if not dry_run:
-            _ensure_tables(cursor)
-            id_counter = _next_customer_id_start(cursor)
-            phone_to_customer_id = _load_existing_customer_map(cursor)
-            existing_vehicle_plates = _load_existing_vehicle_plates(cursor)
-        else:
-            phone_to_customer_id = {}
-            existing_vehicle_plates = set()
+        _ensure_tables(cursor)
+        id_counter = _next_customer_id_start(cursor, imported_ids)
+        id_to_phone, phone_to_customer_id = _load_existing_customer_maps(cursor)
+        existing_vehicle_plates = _load_existing_vehicle_plates(cursor)
 
         for row in rows:
             phone = normalize_phone(_pick(row, ("c_phone", "cphone", "phone", "mobile", "mobile no", "contact", "contact no", "phone number")))
             plate = normalize_number_plate(_pick(row, ("vehi_num", "vehinum", "number plate", "vehicle number", "vehicle no", "registration number", "reg no", "plate")))
             name = _pick(row, ("c_name", "cname", "name", "customer name", "owner name")) or "Guest Customer"
             brand_model = _pick(row, ("vehi_brand", "vehibrand", "brand model", "brand/model", "vehi_name", "vehiname", "vehicle model", "model", "bike model", "vehicle"))
+            imported_customer_id = _normalize_customer_id(_pick(row, ("customer id", "customer_id", "cust id", "id")))
 
             if len(phone) != 10 or not plate:
                 skipped += 1
                 continue
 
-            if dry_run:
-                customers_seen.add(phone)
-                vehicles_seen.add(plate)
-                continue
-
             existing_customer_id = phone_to_customer_id.get(phone)
             if existing_customer_id:
                 customer_id = existing_customer_id
+            elif imported_customer_id and imported_customer_id in id_to_phone:
+                customer_id = imported_customer_id
             else:
-                customer_id = f"CUST{id_counter}"
+                customer_id = imported_customer_id or f"CUST{id_counter}"
                 id_counter += 1
                 phone_to_customer_id[phone] = customer_id
+                id_to_phone[customer_id] = phone
                 customer_rows.append((customer_id, name, phone, plate, datetime.now()))
 
             customers_seen.add(customer_id)
@@ -162,19 +193,22 @@ def import_customers(path, dry_run=False):
             brand, model = (brand_model.split(None, 1) + [""])[:2] if brand_model else ("", "")
             legacy_vehicle_rows.append((plate, customer_id, brand, model))
 
-        if not dry_run and customer_rows:
+        if customer_rows:
             execute_values(
                 cursor,
                 """
                 INSERT INTO customers (id, name, phone, vehicle, created_at)
                 VALUES %s
-                ON CONFLICT DO NOTHING
+                ON CONFLICT (id) DO UPDATE
+                SET name = EXCLUDED.name,
+                    phone = COALESCE(NULLIF(EXCLUDED.phone, ''), customers.phone),
+                    vehicle = COALESCE(NULLIF(EXCLUDED.vehicle, ''), customers.vehicle)
                 """,
                 customer_rows,
                 page_size=1000,
             )
 
-        if not dry_run and customer_vehicle_rows:
+        if customer_vehicle_rows:
             execute_values(
                 cursor,
                 """
@@ -186,7 +220,7 @@ def import_customers(path, dry_run=False):
                 page_size=1000,
             )
 
-        if not dry_run and legacy_vehicle_rows:
+        if legacy_vehicle_rows:
             execute_values(
                 cursor,
                 """
@@ -198,17 +232,15 @@ def import_customers(path, dry_run=False):
                 page_size=1000,
             )
 
-        if not dry_run:
-            db.commit()
+        db.commit()
     except Exception:
         db.rollback()
         raise
     finally:
         cursor.close()
 
-    prefix = "Dry run - " if dry_run else ""
-    print(f"{prefix}Customers imported/found: {len(customers_seen)}")
-    print(f"{prefix}Vehicles imported: {len(vehicles_seen)}")
+    print(f"Customers imported/found: {len(customers_seen)}")
+    print(f"Vehicles imported: {len(vehicles_seen)}")
     print(f"Rows skipped: {skipped}")
 
 

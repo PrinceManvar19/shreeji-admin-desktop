@@ -83,15 +83,3 @@ def calculate_salary(
         'net_salary': total,
     }
 
-
-# Example usage
-if __name__ == "__main__":
-    result = calculate_salary(
-        monthly_salary=25000,
-        total_days=26,
-        attended_days=24,
-        bonus=(1000, False),  # fixed 1000
-        overtime=(500, True),  # 500% wait no, 5%? e.g. (5, True)
-        commission=(2000, False)
-    )
-    print(result)

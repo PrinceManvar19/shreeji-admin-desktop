@@ -27,6 +27,12 @@ from db_local import get_local_db
 from models.worker_model import get_worker
 
 
+def _safe(val, default="—"):
+    if val is None or str(val).strip() == "" or str(val).strip().lower() == "none":
+        return default
+    return str(val)
+
+
 COMPANY_NAME = "SHREEJI AUTO SERVICE"
 COMPANY_ADDRESS = "Shreeji Auto Service, Garage Management Office"
 FONT_REGULAR = "Helvetica"

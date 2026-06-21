@@ -102,10 +102,7 @@ def create_app():
 
     app = Flask(__name__)
 
-    app.secret_key = os.environ.get(
-        "SECRET_KEY",
-        "shreeji-auto-key-2025",
-    )
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', os.urandom(24).hex())
 
     app.config["UPLOAD_FOLDER"] = "static/uploads"
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)

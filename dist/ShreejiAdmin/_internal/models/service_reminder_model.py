@@ -54,6 +54,49 @@ def get_due_service_reminders():
     return reminders
 
 
+def get_due_service_reminders_local():
+    from db_local import local_query
+
+    rows = local_query("""
+        SELECT booking_id,
+               name AS customer_name,
+               phone, vehicle, completed_at,
+               COALESCE(
+                   date(NULLIF(SUBSTR(completed_at,1,10),''), 'utc'),
+                   date(NULLIF(SUBSTR(date,1,10),''), 'utc')
+               ) AS last_service_date,
+               CAST(julianday('now') - julianday(
+                   COALESCE(NULLIF(SUBSTR(completed_at,1,10),''), NULLIF(SUBSTR(date,1,10),''))
+               ) AS INTEGER) AS days_passed,
+               COALESCE(service_reminder_sent, 0) AS service_reminder_sent,
+               reminder_sent_at,
+               reminder_snooze_until
+        FROM cache_bookings
+        WHERE status = 'completed'
+          AND COALESCE(NULLIF(SUBSTR(completed_at,1,10),''), NULLIF(SUBSTR(date,1,10),'')) <= date('now', '-90 days')
+          AND COALESCE(service_reminder_sent, 0) = 0
+          AND (
+              reminder_snooze_until IS NULL
+              OR reminder_snooze_until = ''
+              OR reminder_snooze_until <= date('now')
+          )
+        ORDER BY last_service_date ASC, customer_name ASC
+    """)
+    reminders = []
+    for row in rows:
+        item = dict(row)
+        sent_at = item.get("reminder_sent_at")
+        snooze_until = item.get("reminder_snooze_until")
+        if sent_at:
+            item["reminder_status"] = "Sent"
+        elif snooze_until:
+            item["reminder_status"] = f"Snoozed until {snooze_until}"
+        else:
+            item["reminder_status"] = "Due"
+        reminders.append(item)
+    return reminders
+
+
 def count_due_service_reminders():
     row = query_dict_one("""
         SELECT COUNT(*) AS total
@@ -65,6 +108,23 @@ def count_due_service_reminders():
               reminder_snooze_until IS NULL
               OR reminder_snooze_until = ''
               OR reminder_snooze_until::date <= CURRENT_DATE
+          )
+    """)
+    return int(row["total"] or 0) if row else 0
+
+
+def count_due_service_reminders_local():
+    from db_local import local_query_one
+
+    row = local_query_one("""
+        SELECT COUNT(*) AS total FROM cache_bookings
+        WHERE status = 'completed'
+          AND COALESCE(NULLIF(SUBSTR(completed_at,1,10),''), NULLIF(SUBSTR(date,1,10),'')) <= date('now', '-90 days')
+          AND COALESCE(service_reminder_sent, 0) = 0
+          AND (
+              reminder_snooze_until IS NULL
+              OR reminder_snooze_until = ''
+              OR reminder_snooze_until <= date('now')
           )
     """)
     return int(row["total"] or 0) if row else 0

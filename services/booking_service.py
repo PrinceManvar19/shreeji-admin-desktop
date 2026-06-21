@@ -1,7 +1,7 @@
 import re
 from datetime import datetime, timedelta
 
-from db_neon import get_neon_db as get_db, query_dict_one
+from db_neon import query_dict_one
 from models.audit_log_model import log_audit_action
 from models.booking_model import (
     booking_id_exists,
@@ -15,6 +15,7 @@ from models.booking_model import (
     update_booking_status,
 )
 from models.customer_model import get_customer_by_id, get_customer_map
+from models.customer_model import get_customer_map_local
 from services.slot_service import get_slot_availability
 from utils.constants import (
     STATUS_APPROVED,
@@ -86,6 +87,8 @@ def enrich_booking(booking, customer_map=None):
 
 
 def generate_unique_booking_id(prefix):
+    # This is still optimistic under concurrent booking requests. A Neon sequence
+    # or locked counter table would make ID allocation atomic.
     latest_id = get_latest_booking_id(prefix)
 
     start_number = (
@@ -156,10 +159,6 @@ def get_customer_dashboard_data(customer_id):
 
 def _validate_phone(phone):
     return bool(PHONE_PATTERN.fullmatch(normalize_phone(phone)))
-
-
-def _begin_write_transaction():
-    pass
 
 
 def _validate_booking_input(customer_id, phone, vehicle, service, date):
@@ -292,21 +291,15 @@ def create_booking_for_customer(
     }
 
     try:
-        _begin_write_transaction()
-
         slot = get_slot_availability(booking["date"])
 
         if not slot:
-            get_db().rollback()
             return False, "No slots available for selected date.", None
 
         if slot["available"] <= 0:
-            get_db().rollback()
             return False, "All slots are booked for this date.", None
 
         create_booking(booking)
-
-        get_db().commit()
 
         try:
             log_audit_action(
@@ -324,14 +317,10 @@ def create_booking_for_customer(
                 },
             )
 
-            get_db().commit()
-
         except Exception:
             pass
 
     except Exception as error:
-        get_db().rollback()
-
         log_action(
             "BOOKING ERROR",
             f"{booking.get('booking_id', 'unknown')} - {error}",
@@ -369,6 +358,19 @@ def get_admin_bookings(filters=None):
     ]
 
 
+def get_admin_bookings_local(filters=None):
+    from models.booking_model import search_bookings_local
+
+    filters = filters or {}
+    bookings = search_bookings_local(
+        query=filters.get("query"),
+        date=filters.get("date"),
+        status=filters.get("status"),
+    )
+    customer_map = get_customer_map_local()
+    return [enrich_booking(booking, customer_map) for booking in bookings]
+
+
 def get_today_bookings(today_date, customer_map=None):
     if customer_map is None:
         customer_map = get_customer_map()
@@ -377,6 +379,13 @@ def get_today_bookings(today_date, customer_map=None):
         enrich_booking(booking, customer_map)
         for booking in fetch_today_bookings(today_date)
     ]
+
+
+def get_today_bookings_local(today_date):
+    from models.booking_model import get_today_bookings_local as fetch_local
+
+    customer_map = get_customer_map_local()
+    return [enrich_booking(booking, customer_map) for booking in fetch_local(today_date)]
 
 
 def get_booking_stats(bookings):
@@ -400,6 +409,11 @@ def get_booking_stats(bookings):
 
 def get_today_stats(today_date):
     bookings = get_today_bookings(today_date)
+    return get_booking_stats(bookings)
+
+
+def get_today_stats_local(today_date):
+    bookings = get_today_bookings_local(today_date)
     return get_booking_stats(bookings)
 
 

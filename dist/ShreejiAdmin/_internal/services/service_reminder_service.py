@@ -15,8 +15,20 @@ def list_due_reminders():
     return get_due_service_reminders()
 
 
+def list_due_reminders_local():
+    from models.service_reminder_model import get_due_service_reminders_local
+
+    return get_due_service_reminders_local()
+
+
 def due_reminder_count():
     return count_due_service_reminders()
+
+
+def due_reminder_count_local():
+    from models.service_reminder_model import count_due_service_reminders_local
+
+    return count_due_service_reminders_local()
 
 
 def build_whatsapp_url_for_reminder(booking_id):

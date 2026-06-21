@@ -55,9 +55,6 @@ def mark_salary_as_paid(record_id, admin_user_id=None):
 
 def update_salary_payment_info(record_id, payment_method=None):
     """Save payment_method to an existing record."""
-    if payment_method is None and payment_method != "":
-        return
-
     if payment_method is not None and str(payment_method).strip():
         try:
             _exec("""

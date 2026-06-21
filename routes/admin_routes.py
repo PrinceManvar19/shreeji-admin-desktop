@@ -7,7 +7,7 @@ from urllib.parse import quote
 from flask import Blueprint, jsonify, Response, flash, redirect, render_template, request, session, url_for
 
 from db_neon import get_neon_db as get_db, query_dict, query_dict_one
-from models.booking_model import update_message_flags
+from models.booking_model import get_booking_by_id_local, update_message_flags
 from services.booking_service import (
     approve_booking as approve_booking_service,
     normalize_phone,
@@ -19,17 +19,21 @@ from services.booking_service import (
     create_manual_booking_with_customer,
     enrich_booking,
     get_admin_bookings,
+    get_admin_bookings_local,
     get_booking_by_id,
     get_booking_stats,
+    get_today_bookings_local,
 )
 from services.service_reminder_service import (
     build_whatsapp_url_for_reminder,
     due_reminder_count,
+    due_reminder_count_local,
     list_due_reminders,
+    list_due_reminders_local,
     mark_reminder_sent,
     snooze_reminder,
 )
-from services.slot_service import get_slots_for_admin, set_slot_total
+from services.slot_service import get_slots_for_admin, get_slots_for_admin_local, set_slot_total
 from utils.constants import STATUS_APPROVED, STATUS_CHECKED_IN, STATUS_COMPLETED, STATUS_PENDING, STATUS_REJECTED
 from models.customer_model import (
     add_vehicle_to_customer,
@@ -42,6 +46,37 @@ from models.customer_model import (
 from utils.helpers import format_date_display, format_datetime_display, get_today_date_string, log_action
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
+
+
+def _refresh_cache(booking_id):
+    """Refresh a single booking in the local cache after a write to Neon."""
+    import threading
+    from flask import current_app
+    from services.cache_sync import update_booking_in_cache
+
+    app = current_app._get_current_object()
+    threading.Thread(
+        target=update_booking_in_cache,
+        args=(booking_id, app),
+        daemon=True,
+    ).start()
+
+
+def _refresh_cache_if_stale():
+    """Trigger a background cache sync if cache is older than 90 seconds."""
+    import threading
+    import time
+    from flask import current_app
+    import services.cache_sync as cache_sync
+
+    age = time.time() - cache_sync._last_sync_time
+    if age > 90:
+        app = current_app._get_current_object()
+        threading.Thread(
+            target=cache_sync.sync_now,
+            args=(app,),
+            daemon=True,
+        ).start()
 
 
 def _require_admin():
@@ -67,6 +102,7 @@ def admin():
     admin_guard = _require_admin()
     if admin_guard is not None:
         return admin_guard
+    _refresh_cache_if_stale()
     
     today = get_today_date_string()
     filters = {
@@ -75,7 +111,7 @@ def admin():
         "query": request.args.get("query", "")
     }
     
-    bookings = get_admin_bookings(filters)
+    bookings = get_admin_bookings_local(filters)
     stats = get_booking_stats(bookings)
     
     total_bookings = stats.get('total', 0)
@@ -85,10 +121,10 @@ def admin():
     # Today control panel data
     today_bookings = [
         b for b in bookings
-        if b.get("date") == today or b.get("actual_visit_date") == today
+        if b.get("date") == today
     ]
     today_stats = get_booking_stats(today_bookings)
-    service_due_count = due_reminder_count()
+    service_due_count = due_reminder_count_local()
     
     # Garage vehicles (checked_in)
     vehicles_in_garage = [b for b in bookings if b.get("status") == STATUS_CHECKED_IN]
@@ -100,13 +136,13 @@ def admin():
         if b.get("status") == STATUS_APPROVED and b.get("date") != today
     ]
     
-    slots = get_slots_for_admin()
+    slots = get_slots_for_admin_local()
     
     last_7_days_data = _build_last_7_days_data(bookings)
     
     # Check-in booking data
     checkin_booking_id = request.args.get("checkin_id", "")
-    booking_data = get_booking_by_id(checkin_booking_id) if checkin_booking_id else None
+    booking_data = get_booking_by_id_local(checkin_booking_id) if checkin_booking_id else None
     
     return render_template("admin.html", 
                          bookings=bookings,
@@ -137,10 +173,11 @@ def admin_checkin_page():
     admin_guard = _require_admin()
     if admin_guard is not None:
         return admin_guard
+    _refresh_cache_if_stale()
     
     today = get_today_date_string()
     
-    all_relevant = get_admin_bookings({"status": ""})
+    all_relevant = get_admin_bookings_local({})
     today_queue = [
         b for b in all_relevant
         if b.get("date") == today and b.get("status") == STATUS_APPROVED
@@ -156,7 +193,7 @@ def admin_checkin_page():
     if request.method == "POST" or request.args.get("booking_id"):
         checkin_booking_id = request.form.get("booking_id") or request.args.get("booking_id", "")
         if checkin_booking_id:
-            booking_data = get_booking_by_id(checkin_booking_id)
+            booking_data = get_booking_by_id_local(checkin_booking_id)
     
     return render_template("checkin.html", 
                           today=today,
@@ -191,7 +228,7 @@ def admin_slots():
             **slot,
             "formatted_date": format_date_display(date),
         }
-        for date, slot in get_slots_for_admin().items()
+        for date, slot in get_slots_for_admin_local().items()
     }
     return render_template("admin_slots.html", slots=slots, today=get_today_date_string())
 
@@ -201,13 +238,14 @@ def admin_bookings():
     admin_guard = _require_admin()
     if admin_guard is not None:
         return admin_guard
+    _refresh_cache_if_stale()
 
     filters = {
         "date": request.args.get("date", "").strip(),
         "status": request.args.get("status", "").strip(),
         "query": request.args.get("query", "").strip(),
     }
-    bookings = get_admin_bookings(filters)
+    bookings = get_admin_bookings_local(filters)
     return render_template(
         "admin_bookings.html",
         bookings=bookings,
@@ -221,11 +259,20 @@ def service_reminders():
     admin_guard = _require_admin()
     if admin_guard is not None:
         return admin_guard
+    _refresh_cache_if_stale()
 
     return render_template(
         "service_reminders.html",
-        reminders=list_due_reminders(),
+        reminders=list_due_reminders_local(),
     )
+
+
+@admin_bp.route("/reference")
+def admin_reference():
+    admin_guard = _require_admin()
+    if admin_guard is not None:
+        return admin_guard
+    return render_template("admin_reference.html")
 
 
 @admin_bp.route("/service-reminders/<booking_id>/whatsapp")
@@ -282,6 +329,7 @@ def admin_walkin():
             flash(message, "error")
         else:
             flash(f'Walk-in vehicle added to garage as {booking["booking_id"]}', "success")
+            _refresh_cache(booking["booking_id"])
             fallback = redirect(url_for("admin.admin_walkin"))
             return _redirect_with_whatsapp(booking["booking_id"], booking, fallback)
 
@@ -339,6 +387,8 @@ def approve_booking(booking_id):
         performed_by=_get_current_user_id()
     )
     flash(message if not success else "Booking approved", "error" if not success else "success")
+    if success:
+        _refresh_cache(booking_id)
     fallback = redirect(url_for("admin.admin_bookings"))
     return _redirect_with_whatsapp(booking_id, get_booking_by_id(booking_id) or booking, fallback)
 
@@ -354,6 +404,8 @@ def reject_booking(booking_id):
         performed_by=_get_current_user_id()
     )
     flash(message if not success else "Booking rejected", "error" if not success else "success")
+    if success:
+        _refresh_cache(booking_id)
     fallback = redirect(url_for("admin.admin_bookings"))
     return _redirect_with_whatsapp(booking_id, get_booking_by_id(booking_id) or booking, fallback)
 
@@ -370,6 +422,8 @@ def admin_checkin_booking(booking_id):
         performed_by=_get_current_user_id()
     )
     flash(message if not success else "Vehicle checked in successfully", "error" if not success else "success")
+    if success:
+        _refresh_cache(booking_id)
     fallback = redirect(url_for("admin.admin_checkin_page", booking_id=booking_id))
     return _redirect_with_whatsapp(booking_id, get_booking_by_id(booking_id) or booking, fallback)
 
@@ -392,6 +446,7 @@ def admin_reschedule_checkin(booking_id):
     if request.is_json or request.headers.get("Accept", "").find("application/json") >= 0:
         if not success:
             return jsonify({"success": False, "error": message}), 400
+        _refresh_cache(booking_id)
         booking_data = get_booking_by_id(booking_id)
         whatsapp_url = _get_whatsapp_url(booking_id, booking_data) if booking_data else None
         return jsonify({
@@ -404,6 +459,8 @@ def admin_reschedule_checkin(booking_id):
         })
 
     flash(message if not success else "Late arrival checked in successfully", "error" if not success else "success")
+    if success:
+        _refresh_cache(booking_id)
     fallback = redirect(url_for("admin.admin_checkin_page", booking_id=booking_id))
     return _redirect_with_whatsapp(booking_id, get_booking_by_id(booking_id) or booking, fallback)
 
@@ -419,6 +476,8 @@ def complete_booking(booking_id):
         performed_by=session.get("user", {}).get("id", "unknown"),
     )
     flash(message if not success else "Vehicle marked completed", "error" if not success else "success")
+    if success:
+        _refresh_cache(booking_id)
     fallback = redirect(url_for("admin.admin_checkin_page", booking_id=booking_id))
     return _redirect_with_whatsapp(booking_id, get_booking_by_id(booking_id) or booking, fallback)
 
@@ -701,7 +760,12 @@ def export_data():
     if admin_guard is not None:
         return admin_guard
 
-    return _build_export_response("all")
+    return _build_export_response(
+        request.args.get("data_type", "all").strip() or "all",
+        request.args.get("from_date", "").strip(),
+        request.args.get("to_date", "").strip(),
+        request.args.get("status", "").strip(),
+    )
 
 
 def _get_whatsapp_url(booking_id, booking):
@@ -733,7 +797,7 @@ def _redirect_with_whatsapp(booking_id, booking, fallback_response):
     if not whatsapp_url:
         return fallback_response
     flash("WhatsApp message is ready to send.", "success")
-    return fallback_response
+    return redirect(whatsapp_url)
 
 
 def _csv_response(filename, headers, rows):
@@ -945,6 +1009,7 @@ def api_approve_booking(booking_id):
     if not success:
         return jsonify({"success": False, "error": message}), 400
 
+    _refresh_cache(booking_id)
     booking_data = get_booking_by_id(booking_id)
     whatsapp_url = _get_whatsapp_url(booking_id, booking_data) if booking_data else None
 
@@ -971,6 +1036,7 @@ def api_checkin_booking(booking_id):
     if not success:
         return jsonify({"success": False, "error": message}), 400
 
+    _refresh_cache(booking_id)
     booking_data = get_booking_by_id(booking_id)
     whatsapp_url = _get_whatsapp_url(booking_id, booking_data) if booking_data else None
 
@@ -996,6 +1062,7 @@ def api_complete_booking(booking_id):
     if not success:
         return jsonify({"success": False, "error": message}), 400
 
+    _refresh_cache(booking_id)
     booking_data = get_booking_by_id(booking_id)
     whatsapp_url = _get_whatsapp_url(booking_id, booking_data) if booking_data else None
 
