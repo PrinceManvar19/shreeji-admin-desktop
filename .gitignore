@@ -1,29 +1,23 @@
-# Python
 __pycache__/
 *.pyc
-
-# Database
 *.db
-*.db-journal
-
-# Environment
-.env
-
-# Build and desktop artifacts
 dist/
 build/
 *.spec
 *.zip
 installer/
-desktop_app.py
+.env
+
+# Admin and desktop files
 app.py
+app_admin.py
+desktop_app.py
+db_local.py
 build_and_package.bat
 requirements_desktop.txt
 import_customers.py
-
-# Admin-only app code
-app_admin.py
-db_local.py
+Customer LIst/
+data/
 routes/admin_*.py
 templates/admin*.html
 templates/checkin.html
@@ -43,19 +37,5 @@ services/salary_service.py
 services/service_reminder_service.py
 utils/pdf_generator.py
 
-# Local/private data
-Customer LIst/
-data/
-
-# VS Code
-.vscode/
-
-# OS
-.DS_Store
-Thumbs.db
+# OS metadata
 desktop.ini
-
-# App artifacts
-backup/
-logs.txt
-data/*_updated.json
