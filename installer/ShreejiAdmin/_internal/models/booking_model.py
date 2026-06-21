@@ -356,7 +356,9 @@ def count_bookings_for_slot(date):
         f"""
         SELECT COUNT(*) AS total
         FROM bookings
-        WHERE date = %s AND status IN ({placeholders})
+        WHERE date = %s
+          AND status IN ({placeholders})
+          AND COALESCE(source, '') != 'direct_walkin'
         """,
         (date, *ACTIVE_SLOT_STATUSES),
     )

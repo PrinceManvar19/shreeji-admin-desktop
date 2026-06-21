@@ -64,7 +64,7 @@
             <th>Phone</th>
             <th>Vehicle</th>
             <th>Service</th>
-            <th>Date</th>
+            <th>Slot / Time</th>
             <th>Status</th>
             <th class="action-col">Check-In</th>
             <th class="action-col">WhatsApp</th>
@@ -80,7 +80,7 @@
                 data-phone="{{ b.phone or '-' }}"
                 data-vehicle="{{ b.vehicle }}"
                 data-service="{{ b.service }}"
-                data-date="{{ b.formatted_date or b.date }}"
+                data-date="{{ b.slot_label or b.formatted_date or b.date }}"
                 data-raw-date="{{ b.date }}"
                 data-is-today="{% if b.date == today %}true{% else %}false{% endif %}"
                 data-status="{{ b.status }}"
@@ -96,7 +96,7 @@
                 {% if b.brand_model %}<small>{{ b.brand_model }}</small>{% endif %}
               </td>
               <td>{{ b.service }}</td>
-              <td>{{ b.formatted_date or b.date }}</td>
+              <td>{{ b.slot_label or b.formatted_date or b.date }}</td>
               <td>
                 {% if b.status == 'pending' %}
                   <span class="status-badge status-pending">Pending</span>

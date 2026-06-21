@@ -34,7 +34,7 @@
               #{{ b.id }} — {{ b.service.replace('_', ' ').title() }}
             </div>
             <div style="font-size:0.875rem; color:#64748b; margin-top:4px;">
-              {{ b.vehicle }} &nbsp;·&nbsp; {{ b.date }} &nbsp;·&nbsp; {{ b.slot }}
+              {{ b.vehicle }} &nbsp;·&nbsp; {{ b.slot_label or b.date }}
             </div>
           </div>
           <span class="badge {{ b.status if b.status in ['approved','rejected'] else 'pending' }}">

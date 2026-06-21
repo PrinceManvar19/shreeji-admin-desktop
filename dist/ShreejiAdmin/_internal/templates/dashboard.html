@@ -396,7 +396,7 @@
         <thead>
           <tr>
             <th>Booking ID</th>
-            <th>Date</th>
+            <th>Slot / Time</th>
             <th>Status</th>
             <th>Service</th>
           </tr>
@@ -406,7 +406,7 @@
           {% set booking_status = (b.status or 'pending')|lower %}
           <tr>
             <td><strong>{{ b.booking_id }}</strong></td>
-            <td>{{ b.date }}</td>
+            <td>{{ b.slot_label or b.date }}</td>
             <td>
               <span class="status-pill {{ booking_status if booking_status in ['pending', 'approved', 'checked_in', 'rejected', 'completed'] else 'other' }}">
                 {% if booking_status == 'checked_in' %}

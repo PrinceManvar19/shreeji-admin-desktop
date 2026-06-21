@@ -60,7 +60,7 @@
             <th>Phone</th>
             <th>Vehicle</th>
             <th>Service</th>
-            <th>Booking Date</th>
+            <th>Slot / Time</th>
             <th>Actual Visit Date</th>
             <th>Time</th>
             <th>Status</th>
@@ -82,7 +82,7 @@
                 {% if b.brand_model %}<small class="text-muted">{{ b.brand_model }}</small>{% endif %}
               </td>
               <td>{{ b.service }}</td>
-              <td>{{ b.formatted_date or b.date }}</td>
+              <td>{{ b.slot_label or b.formatted_date or b.date }}</td>
               <td>
                 {% if b.is_rescheduled %}
                   {{ b.formatted_actual_visit_date or b.actual_visit_date or '-' }}
@@ -176,7 +176,7 @@
                 {% if b.brand_model %}<small class="text-muted">{{ b.brand_model }}</small>{% endif %}
               </td>
               <td>{{ b.service }}</td>
-              <td>{{ b.formatted_date or b.date }}</td>
+              <td>{{ b.slot_label or b.formatted_date or b.date }}</td>
               <td>{{ today_display or today }}</td>
               <td class="action-col">
                 {% if b.status == 'approved' and b.date != today %}
@@ -222,7 +222,7 @@
             <th>Vehicle Number</th>
             <th>Brand/Model</th>
             <th>Service</th>
-            <th>Booking Date</th>
+            <th>Slot / Time</th>
             <th>Actual Visit Date</th>
             <th>Check-In Time</th>
             <th>Action</th>
@@ -239,7 +239,7 @@
               <td>{{ b.vehicle }}</td>
               <td>{{ b.brand_model or '-' }}</td>
               <td>{{ b.service }}</td>
-              <td>{{ b.formatted_date or b.date }}</td>
+              <td>{{ b.slot_label or b.formatted_date or b.date }}</td>
               <td>
                 {% if b.is_rescheduled %}
                   {{ b.formatted_actual_visit_date or b.actual_visit_date or '-' }}
@@ -323,7 +323,7 @@
           <div><strong>Phone:</strong> {{ booking.phone or '-' }}</div>
           <div><strong>Vehicle:</strong> {{ booking.vehicle }}</div>
           <div><strong>Service:</strong> {{ booking.service }}</div>
-          <div><strong>Date:</strong> {{ booking.formatted_date or booking.date }}</div>
+          <div><strong>Date:</strong> {{ booking.slot_label or booking.formatted_date or booking.date }}</div>
           <div><strong>Status:</strong> {{ booking.status_display or booking.status }}</div>
         </div>
 

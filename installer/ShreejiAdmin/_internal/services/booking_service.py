@@ -82,6 +82,11 @@ def enrich_booking(booking, customer_map=None):
     enriched["formatted_completed_at"] = format_datetime_display(
         enriched.get("completed_at")
     )
+    enriched["slot_label"] = (
+        "Walk-in"
+        if enriched.get("source") == "direct_walkin"
+        else (enriched.get("formatted_date") or enriched.get("date") or "")
+    )
 
     return enriched
 
@@ -207,6 +212,7 @@ def create_booking_for_customer(
     date,
     performed_by=None,
     source="customer_portal",
+    slot_id="date",
 ):
     normalized_name, normalized_phone, normalized_vehicle, normalized_brand_model, normalized_service, normalized_date = _normalize_booking_data(
         name, phone, vehicle, brand_model, service, date
@@ -267,6 +273,9 @@ def create_booking_for_customer(
         customer.get("phone", "")
     )
 
+    direct_walkin = slot_id is None
+    now_text = datetime.now().strftime("%Y-%m-%d %H:%M")
+
     booking = {
         "booking_id": generate_unique_booking_id("BOOK"),
         "customer_id": normalized_customer_id,
@@ -276,11 +285,11 @@ def create_booking_for_customer(
         "brand_model": normalized_brand_model,
         "service": normalized_service,
         "date": normalized_date,
-        "status": STATUS_PENDING,
-        "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "checked_in_at": None,
+        "status": STATUS_CHECKED_IN if direct_walkin else STATUS_PENDING,
+        "created_at": now_text,
+        "checked_in_at": now_text if direct_walkin else None,
         "completed_at": None,
-        "actual_visit_date": None,
+        "actual_visit_date": normalized_date if direct_walkin else None,
         "is_rescheduled": 0,
         "whatsapp_sent": 0,
         "msg_approved_sent": 0,
@@ -291,13 +300,14 @@ def create_booking_for_customer(
     }
 
     try:
-        slot = get_slot_availability(booking["date"])
+        if not direct_walkin:
+            slot = get_slot_availability(booking["date"])
 
-        if not slot:
-            return False, "No slots available for selected date.", None
+            if not slot:
+                return False, "No slots available for selected date.", None
 
-        if slot["available"] <= 0:
-            return False, "All slots are booked for this date.", None
+            if slot["available"] <= 0:
+                return False, "All slots are booked for this date.", None
 
         create_booking(booking)
 
@@ -534,6 +544,7 @@ def create_manual_booking_with_customer(
     service,
     date,
     performed_by=None,
+    slot_id=None,
 ):
     return create_booking_for_customer(
         customer_id,
@@ -544,5 +555,6 @@ def create_manual_booking_with_customer(
         service,
         date,
         performed_by,
-        source="manual",
+        source="direct_walkin" if slot_id is None else "manual",
+        slot_id=slot_id,
     )

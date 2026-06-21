@@ -201,32 +201,77 @@ def update_booking_in_cache(booking_id, app):
         traceback.print_exc()
 
 
+def update_slot_in_cache(slot_date, app, old_slot_date=None):
+    """Refresh a single slot in the cache after a write to Neon."""
+    try:
+        from db_local import get_local_db
+        from psycopg2.extras import RealDictCursor
+
+        database_url = _get_database_url(app)
+        if not database_url:
+            return
+
+        neon_conn = _neon_connect(database_url)
+        try:
+            with neon_conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(
+                    "SELECT date, total FROM slots WHERE date = %s",
+                    (slot_date,),
+                )
+                row = cursor.fetchone()
+        finally:
+            neon_conn.close()
+
+        sqlite_conn = get_local_db()
+        try:
+            if old_slot_date and old_slot_date != slot_date:
+                sqlite_conn.execute("DELETE FROM cache_slots WHERE date = ?", (old_slot_date,))
+            if row:
+                sqlite_conn.execute(
+                    """
+                    INSERT OR REPLACE INTO cache_slots (date, total)
+                    VALUES (:date, :total)
+                    """,
+                    dict(row),
+                )
+            sqlite_conn.commit()
+        finally:
+            sqlite_conn.close()
+
+        print(f"Cache updated for slot {slot_date}", flush=True)
+
+    except Exception as error:
+        print(f"Cache update failed for slot {slot_date}: {error}", flush=True)
+        traceback.print_exc()
+
+
 def _background_loop(app):
-    failure_count = 0
-    if sync_now(app):
+    with app.app_context():
         failure_count = 0
-    else:
-        failure_count = 1
-
-    while True:
-        if failure_count:
-            delay = min(
-                SYNC_INTERVAL_SECONDS * (2 ** (failure_count - 1)),
-                SYNC_FAILURE_BACKOFF_CAP_SECONDS,
-            )
-            print(
-                f"Cache sync retry delayed for {delay} seconds "
-                f"after {failure_count} failure(s).",
-                flush=True,
-            )
-        else:
-            delay = SYNC_INTERVAL_SECONDS
-
-        time.sleep(delay)
         if sync_now(app):
             failure_count = 0
         else:
-            failure_count += 1
+            failure_count = 1
+
+        while True:
+            if failure_count:
+                delay = min(
+                    SYNC_INTERVAL_SECONDS * (2 ** (failure_count - 1)),
+                    SYNC_FAILURE_BACKOFF_CAP_SECONDS,
+                )
+                print(
+                    f"Cache sync retry delayed for {delay} seconds "
+                    f"after {failure_count} failure(s).",
+                    flush=True,
+                )
+            else:
+                delay = SYNC_INTERVAL_SECONDS
+
+            time.sleep(delay)
+            if sync_now(app):
+                failure_count = 0
+            else:
+                failure_count += 1
 
 
 def start_background_sync(app):

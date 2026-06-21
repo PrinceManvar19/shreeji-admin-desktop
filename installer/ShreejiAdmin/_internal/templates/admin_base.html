@@ -139,6 +139,75 @@
       min-height: 100vh;
     }
 
+    .admin-topbar {
+      position: sticky;
+      top: 0;
+      z-index: 900;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 0.85rem;
+      min-height: 64px;
+      padding: 0.85rem 2.25rem;
+      background: rgba(247, 247, 247, 0.95);
+      border-bottom: 1px solid rgba(26, 26, 26, 0.08);
+      backdrop-filter: blur(10px);
+    }
+
+    .admin-refresh-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      color: #4b5563;
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
+    .admin-refresh-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      min-height: 38px;
+      padding: 0.48rem 0.85rem;
+      border: 1px solid rgba(162, 4, 5, 0.24);
+      border-radius: 8px;
+      background: #fff;
+      color: #a20405;
+      font-weight: 800;
+      transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .admin-refresh-button:hover {
+      background: rgba(162, 4, 5, 0.08);
+      border-color: rgba(162, 4, 5, 0.45);
+      transform: translateY(-1px);
+    }
+
+    .admin-refresh-countdown {
+      min-width: 144px;
+      color: #6b7280;
+      white-space: nowrap;
+    }
+
+    .admin-refresh-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      margin: 0;
+      white-space: nowrap;
+      cursor: pointer;
+      color: #374151;
+    }
+
+    .admin-refresh-toggle input {
+      width: 16px;
+      height: 16px;
+      accent-color: #a20405;
+      cursor: pointer;
+    }
+
     .admin-main .dashboard-wrap {
       max-width: none;
       padding: 2rem 2.25rem 3rem;
@@ -182,6 +251,16 @@
 
       .admin-main .dashboard-wrap {
         padding: 1.25rem 4% 2.5rem;
+      }
+
+      .admin-topbar {
+        position: static;
+        justify-content: flex-start;
+        padding: 0.85rem 4%;
+      }
+
+      .admin-refresh-controls {
+        justify-content: flex-start;
       }
     }
 
@@ -254,6 +333,18 @@
     </aside>
 
     <main class="admin-main">
+      <div class="admin-topbar">
+        <div class="admin-refresh-controls" aria-label="Page refresh controls">
+          <button type="button" class="admin-refresh-button" id="adminManualRefresh">
+            <i class="fas fa-rotate-right"></i> Refresh
+          </button>
+          <span class="admin-refresh-countdown" id="adminRefreshCountdown">Auto-refresh in 3:00</span>
+          <label class="admin-refresh-toggle" for="adminAutoRefreshToggle">
+            <input type="checkbox" id="adminAutoRefreshToggle" />
+            Auto-refresh
+          </label>
+        </div>
+      </div>
       {% block content %}{% endblock %}
     </main>
   </div>
@@ -319,6 +410,75 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+      const refreshButton = document.getElementById('adminManualRefresh');
+      const refreshCountdown = document.getElementById('adminRefreshCountdown');
+      const refreshToggle = document.getElementById('adminAutoRefreshToggle');
+      const refreshStorageKey = 'adminAutoRefreshEnabled';
+      const refreshIntervalSeconds = 180;
+      let remainingRefreshSeconds = refreshIntervalSeconds;
+      let refreshTimer = null;
+
+      function formatRefreshTime(totalSeconds) {
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return minutes + ':' + String(seconds).padStart(2, '0');
+      }
+
+      function updateRefreshCountdown() {
+        if (!refreshCountdown || !refreshToggle) {
+          return;
+        }
+
+        if (!refreshToggle.checked) {
+          refreshCountdown.textContent = 'Auto-refresh off';
+          return;
+        }
+
+        refreshCountdown.textContent = 'Auto-refresh in ' + formatRefreshTime(remainingRefreshSeconds);
+      }
+
+      function stopRefreshTimer() {
+        if (refreshTimer) {
+          window.clearInterval(refreshTimer);
+          refreshTimer = null;
+        }
+      }
+
+      function startRefreshTimer() {
+        stopRefreshTimer();
+        if (!refreshToggle || !refreshToggle.checked) {
+          updateRefreshCountdown();
+          return;
+        }
+
+        remainingRefreshSeconds = refreshIntervalSeconds;
+        updateRefreshCountdown();
+        refreshTimer = window.setInterval(() => {
+          remainingRefreshSeconds -= 1;
+          if (remainingRefreshSeconds <= 0) {
+            window.location.reload();
+            return;
+          }
+          updateRefreshCountdown();
+        }, 1000);
+      }
+
+      if (refreshToggle) {
+        const storedRefreshState = localStorage.getItem(refreshStorageKey);
+        refreshToggle.checked = storedRefreshState === null ? true : storedRefreshState === 'true';
+        refreshToggle.addEventListener('change', () => {
+          localStorage.setItem(refreshStorageKey, refreshToggle.checked ? 'true' : 'false');
+          startRefreshTimer();
+        });
+        startRefreshTimer();
+      }
+
+      if (refreshButton) {
+        refreshButton.addEventListener('click', () => {
+          window.location.reload();
+        });
+      }
+
       document.querySelectorAll('form').forEach((form) => {
         form.addEventListener('submit', (event) => {
           const submitter = event.submitter;

@@ -40,7 +40,7 @@
           <div><strong>Vehicle Number:</strong> {{ verified_booking.vehicle }}</div>
           <div><strong>Brand/Model:</strong> {{ verified_booking.brand_model or '-' }}</div>
           <div><strong>Service Type:</strong> {{ verified_booking.service }}</div>
-          <div><strong>Booking Date:</strong> {{ verified_booking.formatted_date or verified_booking.date }}</div>
+          <div><strong>Booking Date:</strong> {{ verified_booking.slot_label or verified_booking.formatted_date or verified_booking.date }}</div>
           <div><strong>Status:</strong> {{ verified_booking.status_display or verified_booking.status }}</div>
         </div>
 
@@ -300,7 +300,7 @@
           <div><strong>Phone:</strong> {{ booking.phone or '-' }}</div>
           <div><strong>Vehicle:</strong> {{ booking.vehicle }}</div>
           <div><strong>Service:</strong> {{ booking.service }}</div>
-          <div><strong>Date:</strong> {{ booking.formatted_date or booking.date }}</div>
+          <div><strong>Date:</strong> {{ booking.slot_label or booking.formatted_date or booking.date }}</div>
           <div>
             <strong>Status:</strong>
             {% if booking.status == 'pending' %}

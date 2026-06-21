@@ -1,10 +1,20 @@
 import os
 import sqlite3
+import sys
 from pathlib import Path
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-DATA_DIR = PROJECT_ROOT / "data"
+def _get_data_dir():
+    if sys.platform == "win32":
+        base = os.getenv("APPDATA") or Path.home()
+    else:
+        base = Path.home() / ".local" / "share"
+    data_dir = Path(base) / "ShreejiAutoService"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir
+
+
+DATA_DIR = _get_data_dir()
 DB_PATH = DATA_DIR / "garage.db"
 
 
@@ -145,14 +155,24 @@ CREATE TABLE IF NOT EXISTS cache_slots (
     date TEXT PRIMARY KEY,
     total INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    booking_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    performed_by TEXT DEFAULT '',
+    performed_by_id TEXT DEFAULT '',
+    details TEXT DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
 """
 
 
 def get_local_db():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.row_factory = sqlite3.Row
     return conn
 
 

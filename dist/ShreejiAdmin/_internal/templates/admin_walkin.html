@@ -80,7 +80,7 @@
         </div>
         <div class="dash-form-group">
           <label>Date</label>
-          <input type="date" name="date" value="{{ today }}" />
+          <input type="date" id="walkin-date-input" name="date" value="{{ today }}" />
         </div>
       </div>
 
@@ -93,6 +93,23 @@
             <option value="Engine Work">Engine Work</option>
             <option value="Washing">Washing</option>
           </select>
+        </div>
+        <div class="dash-form-group">
+          <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
+            <input type="checkbox" id="no-slot-walkin" name="no_slot_walkin" checked />
+            No slot / Direct walk-in
+          </label>
+          <div id="walkin-slot-group" style="display:none;">
+            <label>Slot</label>
+            <select id="walkin-slot-select" name="slot_id">
+              <option value="">Select available slot</option>
+              {% for date, slot in slots|default({})|dictsort %}
+                {% if slot.available > 0 %}
+                  <option value="{{ date }}">{{ slot.formatted_date or date }} - {{ slot.available }} available</option>
+                {% endif %}
+              {% endfor %}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -158,6 +175,10 @@
   const vehicleListContainer = document.getElementById('vehicleListContainer');
   const vehicleList = document.getElementById('vehicleList');
   const brandModelInput = document.getElementById('brand-model-input');
+  const walkinDateInput = document.getElementById('walkin-date-input');
+  const noSlotWalkinInput = document.getElementById('no-slot-walkin');
+  const walkinSlotGroup = document.getElementById('walkin-slot-group');
+  const walkinSlotSelect = document.getElementById('walkin-slot-select');
 
   const addVehicleBtn = document.getElementById('admin-add-vehicle-btn');
   const addVehicleModal = document.getElementById('adminAddVehicleModal');
@@ -592,6 +613,37 @@
       setVehicleLookupMessage('Select an existing vehicle or add a new one before submitting.', 'error');
       return;
     }
+
+    if (!noSlotWalkinInput.checked && !walkinSlotSelect.value) {
+      event.preventDefault();
+      setVehicleLookupMessage('Select a slot or choose No slot / Direct walk-in.', 'error');
+      walkinSlotSelect.focus();
+      return;
+    }
+
+    if (noSlotWalkinInput.checked) {
+      walkinSlotSelect.value = '';
+    }
+  });
+
+  function syncWalkinSlotMode() {
+    const directWalkin = noSlotWalkinInput.checked;
+    walkinSlotGroup.style.display = directWalkin ? 'none' : 'block';
+    walkinSlotSelect.disabled = directWalkin;
+    if (directWalkin) {
+      walkinSlotSelect.value = '';
+      return;
+    }
+    if (walkinSlotSelect.value) {
+      walkinDateInput.value = walkinSlotSelect.value;
+    }
+  }
+
+  noSlotWalkinInput.addEventListener('change', syncWalkinSlotMode);
+  walkinSlotSelect.addEventListener('change', function() {
+    if (walkinSlotSelect.value) {
+      walkinDateInput.value = walkinSlotSelect.value;
+    }
   });
 
   searchButton.addEventListener('click', searchCustomer);
@@ -633,5 +685,6 @@
   });
 
   setCustomerBadge('Enter a 10 digit phone number to begin.', 'default');
+  syncWalkinSlotMode();
 </script>
 {% endblock %}

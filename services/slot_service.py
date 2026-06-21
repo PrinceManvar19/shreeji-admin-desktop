@@ -67,6 +67,7 @@ def get_slots_for_admin():
         LEFT JOIN bookings b
           ON b.date = s.date
          AND b.status IN ({placeholders})
+         AND COALESCE(b.source, '') != 'direct_walkin'
         GROUP BY s.date, s.total
         ORDER BY s.date DESC
         """,

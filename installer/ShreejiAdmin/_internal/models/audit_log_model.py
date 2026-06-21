@@ -3,7 +3,7 @@
 import json
 from datetime import datetime
 
-from db_neon import get_neon_db as get_db, query_dict, query_dict_one, execute_query
+from db_local import get_local_db, local_query as query_dict, local_query_one as query_dict_one
 
 
 AUDIT_LOG_COLUMNS = """
@@ -41,8 +41,9 @@ def _serialize_details(details):
 
 
 def log_audit_action(booking_id, action, performed_by=None, performed_by_id=None, details=None):
+    db = None
     try:
-        db = get_db()
+        db = get_local_db()
         cursor = db.cursor()
         try:
             cursor.execute(
@@ -51,7 +52,7 @@ def log_audit_action(booking_id, action, performed_by=None, performed_by_id=None
                     booking_id, action, performed_by, performed_by_id,
                     details, created_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
                     booking_id or "",
@@ -66,8 +67,13 @@ def log_audit_action(booking_id, action, performed_by=None, performed_by_id=None
         finally:
             cursor.close()
     except Exception as e:
+        if db is not None:
+            db.rollback()
         from utils.helpers import log_action
         log_action("AUDIT_LOG_FALLBACK", f"{booking_id} - {action} - {performed_by} - Error: {str(e)}")
+    finally:
+        if db is not None:
+            db.close()
 
 
 def get_audit_logs(booking_id=None, action=None, limit=50, offset=0):
@@ -75,10 +81,10 @@ def get_audit_logs(booking_id=None, action=None, limit=50, offset=0):
     params = []
 
     if booking_id:
-        conditions.append("booking_id = %s")
+        conditions.append("booking_id = ?")
         params.append(booking_id)
     if action:
-        conditions.append("action = %s")
+        conditions.append("action = ?")
         params.append(action.lower().strip())
 
     where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
@@ -90,7 +96,7 @@ def get_audit_logs(booking_id=None, action=None, limit=50, offset=0):
         FROM audit_logs
         {where_clause}
         ORDER BY created_at DESC
-        LIMIT %s OFFSET %s
+        LIMIT ? OFFSET ?
         """,
         tuple(params),
     )
@@ -101,10 +107,10 @@ def get_audit_log_count(booking_id=None, action=None):
     conditions = []
     params = []
     if booking_id:
-        conditions.append("booking_id = %s")
+        conditions.append("booking_id = ?")
         params.append(booking_id)
     if action:
-        conditions.append("action = %s")
+        conditions.append("action = ?")
         params.append(action.lower().strip())
     where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
     row = query_dict_one(
@@ -120,7 +126,7 @@ def get_latest_audit_action(booking_id, action):
         SELECT id, booking_id, action, performed_by, performed_by_id,
                details, created_at
         FROM audit_logs
-        WHERE booking_id = %s AND action = %s
+        WHERE booking_id = ? AND action = ?
         ORDER BY created_at DESC
         LIMIT 1
         """,

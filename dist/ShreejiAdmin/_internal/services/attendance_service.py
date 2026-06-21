@@ -1,13 +1,10 @@
 """Attendance service layer — business logic for attendance-to-salary integration."""
 
-import datetime
 import calendar
 
 from models.attendance_model import (
     calculate_month_attendance,
-    get_attendance_for_worker,
 )
-from models.worker_model import get_all_workers
 
 
 def get_attendance_summary_for_period(worker_id, year, month):

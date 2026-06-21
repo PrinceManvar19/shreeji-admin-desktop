@@ -4,10 +4,11 @@ from datetime import datetime, timedelta
 from io import BytesIO, StringIO
 from urllib.parse import quote
 
-from flask import Blueprint, jsonify, Response, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, current_app, jsonify, Response, flash, redirect, render_template, request, session, url_for
 
 from db_neon import get_neon_db as get_db, query_dict, query_dict_one
-from models.booking_model import get_booking_by_id_local, update_message_flags
+from models.booking_model import count_bookings_for_slot, get_booking_by_id_local, update_message_flags
+from models.slot_model import update_slot
 from services.booking_service import (
     approve_booking as approve_booking_service,
     normalize_phone,
@@ -333,7 +334,14 @@ def admin_walkin():
             fallback = redirect(url_for("admin.admin_walkin"))
             return _redirect_with_whatsapp(booking["booking_id"], booking, fallback)
 
-    return render_template("admin_walkin.html", today=today)
+    slots = {
+        date: {
+            **slot,
+            "formatted_date": format_date_display(date),
+        }
+        for date, slot in get_slots_for_admin_local().items()
+    }
+    return render_template("admin_walkin.html", today=today, slots=slots)
 
 
 @admin_bp.route("/export")
@@ -373,6 +381,48 @@ def set_slots():
         return redirect(url_for("admin.admin_slots"))
 
     flash("Slots updated successfully", "success")
+    return redirect(url_for("admin.admin_slots"))
+
+
+@admin_bp.route("/slots/<slot_id>/edit", methods=["POST"])
+def edit_slot(slot_id):
+    admin_guard = _require_admin()
+    if admin_guard is not None:
+        return admin_guard
+
+    date = request.form.get("date", "").strip()
+    time_value = request.form.get("time", "").strip()
+    max_bookings_value = (
+        request.form.get("max_bookings", "").strip()
+        or request.form.get("slots", "").strip()
+    )
+    status = request.form.get("status", "open").strip().lower()
+    booked_count = count_bookings_for_slot(slot_id)
+
+    try:
+        max_bookings = int(max_bookings_value)
+    except ValueError:
+        flash("Max bookings must be a valid number", "error")
+        return redirect(url_for("admin.admin_slots"))
+
+    if max_bookings < booked_count:
+        flash("Cannot reduce slots below booked count", "error")
+        return redirect(url_for("admin.admin_slots"))
+
+    if status == "closed":
+        max_bookings = booked_count
+
+    result = update_slot(slot_id, date, time_value, max_bookings, status)
+    if not result.get("success"):
+        flash(result.get("error", "Slot could not be updated"), "error")
+        return redirect(url_for("admin.admin_slots"))
+
+    from services.cache_sync import update_slot_in_cache
+
+    app = current_app._get_current_object()
+    update_slot_in_cache(result["slot"]["date"], app, old_slot_date=slot_id)
+
+    flash("Slot updated successfully", "success")
     return redirect(url_for("admin.admin_slots"))
 
 
@@ -1087,7 +1137,9 @@ def _handle_walkin_submission(form, default_date, performed_by=None):
     vehicle_model = form.get("vehicle_model", "").strip()
     brand_model = form.get("brand_model", "").strip()
     service = form.get("service", "").strip()
-    date = form.get("date", "").strip() or default_date
+    direct_walkin = form.get("no_slot_walkin") == "on"
+    slot_id = None if direct_walkin else form.get("slot_id", "").strip()
+    date = (default_date if direct_walkin else (slot_id or form.get("date", "").strip())) or default_date
 
     if not all([name, phone, vehicle, brand_model, service]):
         return False, "Please fill all manual entry fields.", None
@@ -1125,4 +1177,5 @@ def _handle_walkin_submission(form, default_date, performed_by=None):
         service,
         date,
         performed_by=performed_by,
+        slot_id=slot_id,
     )

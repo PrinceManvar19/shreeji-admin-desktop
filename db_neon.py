@@ -154,18 +154,6 @@ def _create_tables(cursor, db):
     """)
 
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS audit_logs (
-            id SERIAL PRIMARY KEY,
-            booking_id TEXT NOT NULL,
-            action TEXT NOT NULL,
-            performed_by TEXT,
-            performed_by_id TEXT,
-            details TEXT DEFAULT '{}',
-            created_at TEXT NOT NULL
-        )
-    """)
-
-    cursor.execute("""
         CREATE TABLE IF NOT EXISTS vehicles (
             plate_number TEXT PRIMARY KEY,
             customer_id TEXT NOT NULL,
