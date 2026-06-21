@@ -499,3 +499,10 @@ def ensure_customer_by_phone(phone, name="Guest Customer"):
 def get_customer_map():
     rows = query_dict("SELECT id, name, phone, vehicle FROM customers")
     return {row["id"]: dict(row) for row in rows}
+
+
+def get_customer_map_local():
+    from db_local import local_query
+
+    rows = local_query("SELECT id, name, phone, vehicle FROM cache_customers")
+    return {row["id"]: row for row in rows}

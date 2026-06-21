@@ -1,0 +1,113 @@
+{% extends "admin_base.html" %}
+{% block title %}Export Data - Shreeji Auto Services{% endblock %}
+
+{% block content %}
+<div class="dashboard-wrap">
+  <div class="dash-header">
+    <div>
+      <h1 class="dash-title">
+        <i class="fas fa-file-export"></i> Export Data
+      </h1>
+      <p class="dash-sub">Download filtered CSV files or a combined ZIP archive.</p>
+    </div>
+  </div>
+
+  <div class="dash-card">
+    <h2>Export Data</h2>
+
+    <form method="GET" action="/admin/export/download" class="dash-form" id="exportForm">
+      <div class="dash-form-group">
+        <label>Data Type</label>
+        <select name="data_type" id="dataType" required>
+          <option value="">Select Data Type</option>
+          <option value="bookings">Booking List</option>
+          <option value="customers">Customer List</option>
+          <option value="garage">Garage Data (currently in garage)</option>
+          <option value="all">All Data (Bookings + Customers)</option>
+        </select>
+      </div>
+
+      <div class="dash-form-row" id="dateRangeRow">
+        <div class="dash-form-group">
+          <label>From Date</label>
+          <input type="date" name="from_date" placeholder="From Date">
+        </div>
+        <div class="dash-form-group">
+          <label>To Date</label>
+          <input type="date" name="to_date" placeholder="To Date">
+        </div>
+      </div>
+
+      <div class="dash-form-group" id="statusFilterRow">
+        <label>Status Filter</label>
+        <select name="status">
+          <option value="">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="checked_in">In Garage</option>
+          <option value="completed">Completed</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
+
+      <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
+        <button type="button" id="preview-btn" class="dash-btn-secondary">Preview Count</button>
+        <button type="submit" id="export-btn" class="dash-btn-primary" disabled>Export as CSV</button>
+      </div>
+
+      <p class="booking-modal-message" id="preview-result" hidden></p>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  const exportForm = document.getElementById('exportForm');
+  const dataType = document.getElementById('dataType');
+  const dateRangeRow = document.getElementById('dateRangeRow');
+  const statusFilterRow = document.getElementById('statusFilterRow');
+  const previewButton = document.getElementById('preview-btn');
+  const exportButton = document.getElementById('export-btn');
+  const previewResult = document.getElementById('preview-result');
+
+  function updateExportControls() {
+    const selectedType = dataType.value;
+    const showDateRange = selectedType === 'bookings' || selectedType === 'garage';
+    const showStatus = selectedType === 'bookings';
+    exportButton.disabled = !selectedType;
+    dateRangeRow.style.display = showDateRange ? 'grid' : 'none';
+    statusFilterRow.style.display = showStatus ? 'flex' : 'none';
+    dateRangeRow.querySelectorAll('input').forEach(input => input.disabled = !showDateRange);
+    statusFilterRow.querySelector('select').disabled = !showStatus;
+    previewResult.hidden = true;
+  }
+
+  dataType.addEventListener('change', updateExportControls);
+
+  previewButton.addEventListener('click', async function() {
+    if (!dataType.value) {
+      previewResult.hidden = false;
+      previewResult.style.color = '#991b1b';
+      previewResult.textContent = 'Select a data type first.';
+      return;
+    }
+
+    const params = new URLSearchParams(new FormData(exportForm));
+
+    try {
+      const response = await fetch('/admin/export-preview?' + params.toString());
+      const data = await response.json();
+      previewResult.hidden = false;
+      previewResult.style.color = '#065f46';
+      previewResult.textContent = data.count + ' records will be exported';
+    } catch (error) {
+      previewResult.hidden = false;
+      previewResult.style.color = '#991b1b';
+      previewResult.textContent = 'Preview count failed. Try again.';
+    }
+  });
+
+  updateExportControls();
+</script>
+{% endblock %}

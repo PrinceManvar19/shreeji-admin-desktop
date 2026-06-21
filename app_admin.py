@@ -3,10 +3,12 @@ import os
 from dotenv import load_dotenv
 from flask import Flask, jsonify
 
-from db_neon import init_app as init_db_app
+import db_neon
 from db_local import init_local_db
+from routes.admin_attendance_routes import att_bp
+from routes.admin_routes import admin_bp
+from routes.admin_salary_routes import salary_bp
 from routes.auth_routes import auth_bp
-from routes.customer_routes import customer_bp
 from routes.main_routes import main_bp
 from services.auth_service import ensure_session_user
 
@@ -103,6 +105,9 @@ def create_app():
     app = Flask(__name__)
 
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', os.urandom(24).hex())
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["SESSION_COOKIE_SECURE"] = False
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
 
     app.config["UPLOAD_FOLDER"] = "static/uploads"
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
@@ -122,17 +127,7 @@ def create_app():
 
     app.config["DATABASE_URL"] = database_url
 
-    try:
-        init_db_app(app)
-    except Exception as error:
-        message = (
-            "Database initialization failed. Verify DATABASE_URL points to a "
-            f"reachable PostgreSQL database. Error: {error}"
-        )
-        print(f"STARTUP CONFIGURATION ERROR: {message}", flush=True)
-        app.config["STARTUP_CONFIG_ERROR"] = message
-        register_configuration_error_routes(app, message)
-        return app
+    db_neon.init_app(app)
 
     @app.before_request
     def sync_session_user():
@@ -140,7 +135,9 @@ def create_app():
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
-    app.register_blueprint(customer_bp)
+    app.register_blueprint(admin_bp)
+    app.register_blueprint(salary_bp)
+    app.register_blueprint(att_bp)
 
     @app.route("/health")
     def health_check():
@@ -148,8 +145,10 @@ def create_app():
             "status": "ok",
             "environment": environment,
             "database_url_found": True,
+            "db_ready": db_neon.db_ready,
+            "db_error": str(db_neon.db_error) if db_neon.db_error else "",
             "local_db": "initialised",
-            "mode": "public",
+            "mode": "admin",
             "message": "Garage Management System Running",
         })
 
@@ -163,6 +162,6 @@ if __name__ == "__main__":
     app.config["TEMPLATES_AUTO_RELOAD"] = True
     app.run(
         host="0.0.0.0",
-        port=int(os.environ.get("PORT", 5000)),
-        debug=not is_railway_environment(),
+        port=int(os.environ.get("PORT", 5050)),
+        debug=os.getenv("FLASK_DEBUG", "false").lower() == "true",
     )

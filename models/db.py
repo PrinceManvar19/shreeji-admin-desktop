@@ -1,17 +1,10 @@
 import json
 import os
-import threading
-from pathlib import Path
-
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from pathlib import Path
 
 from flask import current_app, g
-
-db_ready = False
-db_error = None
-_db_init_thread = None
-_db_init_lock = threading.Lock()
 
 
 def clean_database_url(database_url):
@@ -33,8 +26,8 @@ def clean_database_url(database_url):
     return cleaned
 
 
-def get_neon_db():
-    if "neon_db" not in g:
+def get_db():
+    if "db" not in g:
         database_url = clean_database_url(
             current_app.config.get("DATABASE_URL") or os.getenv("DATABASE_URL")
         )
@@ -46,20 +39,35 @@ def get_neon_db():
             )
 
         connection = psycopg2.connect(database_url, connect_timeout=5)
-        g.neon_db = connection
+        g.db = connection
 
-    return g.neon_db
+    return g.db
 
 
-def close_neon_db(_error=None):
-    connection = g.pop("neon_db", None)
+def safe_execute(db_func, *args, **kwargs):
+    try:
+        return db_func(*args, **kwargs)
+
+    except Exception as e:
+        from utils.helpers import log_action
+
+        log_action(
+            "DB SAFE EXECUTE ERROR",
+            f"{db_func.__name__} - {str(e)}"
+        )
+
+        raise
+
+
+def close_db(_error=None):
+    connection = g.pop("db", None)
 
     if connection is not None:
         connection.close()
 
 
 def query_dict(sql, params=None):
-    db = get_neon_db()
+    db = get_db()
 
     cursor = db.cursor(cursor_factory=RealDictCursor)
 
@@ -72,7 +80,7 @@ def query_dict(sql, params=None):
 
 
 def query_dict_one(sql, params=None):
-    db = get_neon_db()
+    db = get_db()
 
     cursor = db.cursor(cursor_factory=RealDictCursor)
 
@@ -85,7 +93,7 @@ def query_dict_one(sql, params=None):
 
 
 def execute_query(sql, params=None):
-    db = get_neon_db()
+    db = get_db()
 
     cursor = db.cursor()
 
@@ -116,8 +124,7 @@ def _create_tables(cursor, db):
         CREATE TABLE IF NOT EXISTS admins (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
-            phone TEXT,
-            password_hash TEXT
+            phone TEXT
         )
     """)
 
@@ -154,6 +161,57 @@ def _create_tables(cursor, db):
     """)
 
     cursor.execute("""
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id SERIAL PRIMARY KEY,
+            booking_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            performed_by TEXT,
+            performed_by_id TEXT,
+            details TEXT DEFAULT '{}',
+            created_at TEXT NOT NULL
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS workers (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            phone TEXT,
+            monthly_salary REAL,
+            worker_status TEXT DEFAULT 'active'
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS salary_records (
+            id SERIAL PRIMARY KEY,
+            worker_id TEXT,
+            month TEXT,
+            year INTEGER,
+            total_days INTEGER,
+            attended_days REAL,
+            per_day_salary REAL,
+            base_salary REAL,
+            bonus REAL,
+            overtime REAL,
+            commission REAL,
+            gross_salary REAL DEFAULT 0,
+            pocket_money_deduction REAL DEFAULT 0,
+            monthly_advance_entry_count INTEGER DEFAULT 0,
+            previous_pending_debt REAL DEFAULT 0,
+            debt_recovery_deduction REAL DEFAULT 0,
+            extra_salary REAL DEFAULT 0,
+            remaining_debt_balance REAL DEFAULT 0,
+            final_payable_salary REAL DEFAULT 0,
+            net_salary REAL DEFAULT 0,
+            total_salary REAL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (worker_id) REFERENCES workers(id),
+            UNIQUE(worker_id, month, year)
+        )
+    """)
+
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS vehicles (
             plate_number TEXT PRIMARY KEY,
             customer_id TEXT NOT NULL,
@@ -176,10 +234,51 @@ def _create_tables(cursor, db):
     """)
 
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS _migration_log (
-            key TEXT PRIMARY KEY,
-            ran_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        CREATE TABLE IF NOT EXISTS pocket_money_entries (
+            id SERIAL PRIMARY KEY,
+            worker_id TEXT NOT NULL,
+            amount NUMERIC(10,2) NOT NULL,
+            entry_date DATE NOT NULL DEFAULT CURRENT_DATE,
+            note TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (worker_id) REFERENCES workers(id)
         )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS worker_debts (
+            id SERIAL PRIMARY KEY,
+            worker_id TEXT NOT NULL,
+            debt_amount NUMERIC(10,2) NOT NULL,
+            debt_date DATE NOT NULL DEFAULT CURRENT_DATE,
+            reason TEXT,
+            remaining_balance NUMERIC(10,2) NOT NULL,
+            status TEXT NOT NULL DEFAULT 'open',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (worker_id) REFERENCES workers(id)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS debt_recoveries (
+            id SERIAL PRIMARY KEY,
+            debt_id INTEGER NOT NULL,
+            worker_id TEXT NOT NULL,
+            salary_record_id INTEGER,
+            recovery_amount NUMERIC(10,2) NOT NULL,
+            recovery_date DATE NOT NULL DEFAULT CURRENT_DATE,
+            note TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (debt_id) REFERENCES worker_debts(id),
+            FOREIGN KEY (worker_id) REFERENCES workers(id),
+            FOREIGN KEY (salary_record_id) REFERENCES salary_records(id)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_workers_phone_unique
+        ON workers(phone)
+        WHERE phone IS NOT NULL AND phone <> ''
     """)
 
     cursor.execute("""
@@ -189,7 +288,6 @@ def _create_tables(cursor, db):
     """)
 
     db.commit()
-
 
 def _migrations_already_done(cursor, db):
     """Returns True if all one-time migrations have already run."""
@@ -222,26 +320,27 @@ def _mark_migrations_done(cursor, db):
     db.commit()
 
 
-def init_neon_db():
-    global db_ready
-
-    db = get_neon_db()
+def init_db():
+    db = get_db()
 
     cursor = db.cursor(cursor_factory=RealDictCursor)
 
     try:
         _create_tables(cursor, db)
-        migrate_bookings_table(cursor, db)
-        migrate_customers_table(cursor, db)
-        migrate_customer_vehicles(cursor, db)
 
         if not _migrations_already_done(cursor, db):
-            migrate_vehicles(cursor, db)
+            migrate_workers_table(cursor, db)
+            migrate_customers_table(cursor, db)
+            migrate_bookings_table(cursor, db)
+            migrate_salary_table(cursor, db)
+            migrate_service_reminders(cursor, db)
+            migrate_advance_tables(cursor, db)
             migrate_json_data(cursor, db)
+            migrate_vehicles(cursor, db)
+            migrate_customer_vehicles(cursor, db)
             _mark_migrations_done(cursor, db)
 
         seed_admins(cursor, db)
-        db_ready = True
 
     except psycopg2.Error as e:
         db.rollback()
@@ -249,43 +348,6 @@ def init_neon_db():
 
     finally:
         cursor.close()
-
-
-def _run_background_init(app):
-    global db_error, db_ready
-
-    db_ready = False
-    db_error = None
-
-    try:
-        with app.app_context():
-            init_neon_db()
-        print("Neon database startup check completed.", flush=True)
-
-    except Exception as error:
-        db_ready = False
-        db_error = error
-        print(
-            f"WARNING: Neon database startup check failed: {error}",
-            flush=True,
-        )
-
-
-def start_background_init(app):
-    global _db_init_thread
-
-    with _db_init_lock:
-        if _db_init_thread and _db_init_thread.is_alive():
-            return _db_init_thread
-
-        _db_init_thread = threading.Thread(
-            target=_run_background_init,
-            args=(app,),
-            name="neon-db-startup",
-            daemon=True,
-        )
-        _db_init_thread.start()
-        return _db_init_thread
 
 
 def seed_admins(cursor, db):
@@ -440,36 +502,32 @@ def migrate_bookings_table(cursor, db):
         "msg_completed_sent"
     ]
 
-    text_columns = [
-        "customer_id",
-        "phone",
-        "brand_model",
-        "created_at",
-        "checked_in_at",
-        "completed_at",
-        "actual_visit_date",
-        "reminder_sent_at",
-        "reminder_snooze_until",
-    ]
-    integer_columns = [
-        "whatsapp_sent",
-        "is_rescheduled",
-        "service_reminder_sent",
-        *message_flags,
-    ]
     columns_to_add = []
 
-    for col in text_columns + integer_columns:
+    for col in [
+        "whatsapp_sent",
+        "actual_visit_date",
+        "is_rescheduled",
+        "reminder_sent_at",
+        "reminder_snooze_until",
+        "service_reminder_sent"
+    ] + message_flags:
+
         if col not in existing_columns:
             columns_to_add.append(col)
 
     for col in columns_to_add:
-        if col in integer_columns:
+        if col in ("actual_visit_date", "reminder_sent_at", "reminder_snooze_until"):
+            cursor.execute(
+                "ALTER TABLE bookings ADD COLUMN actual_visit_date TEXT"
+                if col == "actual_visit_date"
+                else f"ALTER TABLE bookings ADD COLUMN {col} TEXT"
+            )
+
+        else:
             cursor.execute(
                 f"ALTER TABLE bookings ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0"
             )
-        else:
-            cursor.execute(f"ALTER TABLE bookings ADD COLUMN {col} TEXT")
 
     if "source" not in existing_columns:
         cursor.execute("ALTER TABLE bookings ADD COLUMN source TEXT DEFAULT 'customer_portal'")
@@ -482,6 +540,117 @@ def migrate_customers_table(cursor, db):
         ALTER TABLE customers
         ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     """)
+    db.commit()
+
+
+def migrate_workers_table(cursor, db):
+    cursor.execute("""
+        ALTER TABLE workers
+        ADD COLUMN IF NOT EXISTS worker_status TEXT DEFAULT 'active'
+    """)
+
+    cursor.execute("""
+        UPDATE workers
+        SET worker_status = 'active'
+        WHERE worker_status IS NULL OR TRIM(worker_status) = ''
+    """)
+
+
+    db.commit()
+
+
+def migrate_salary_table(cursor, db):
+    salary_columns = {
+        "salary_status": "TEXT NOT NULL DEFAULT 'finalized'",
+        "payment_status": "TEXT DEFAULT 'pending'",
+        "paid_at": "TEXT",
+        "payment_method": "TEXT",
+        "updated_at": "TEXT",
+        "gross_salary": "REAL DEFAULT 0",
+        "pocket_money_deduction": "REAL DEFAULT 0",
+        "monthly_advance_entry_count": "INTEGER DEFAULT 0",
+        "previous_pending_debt": "REAL DEFAULT 0",
+        "debt_recovery_deduction": "REAL DEFAULT 0",
+        "remaining_debt_balance": "REAL DEFAULT 0",
+        "final_payable_salary": "REAL DEFAULT 0",
+        "net_salary": "REAL DEFAULT 0",
+    }
+
+    for column, definition in salary_columns.items():
+        cursor.execute(f"""
+            ALTER TABLE salary_records
+            ADD COLUMN IF NOT EXISTS {column} {definition}
+        """)
+
+    cursor.execute("""
+        UPDATE salary_records
+        SET gross_salary = COALESCE(NULLIF(gross_salary, 0), base_salary, total_salary, 0),
+            final_payable_salary = COALESCE(NULLIF(final_payable_salary, 0), total_salary, 0),
+            net_salary = COALESCE(NULLIF(net_salary, 0), total_salary, 0)
+    """)
+
+    db.commit()
+
+
+def migrate_service_reminders(cursor, db):
+    cursor.execute("""
+        ALTER TABLE bookings
+        ADD COLUMN IF NOT EXISTS reminder_sent_at TEXT
+    """)
+    cursor.execute("""
+        ALTER TABLE bookings
+        ADD COLUMN IF NOT EXISTS reminder_snooze_until TEXT
+    """)
+    cursor.execute("""
+        ALTER TABLE bookings
+        ADD COLUMN IF NOT EXISTS service_reminder_sent INTEGER NOT NULL DEFAULT 0
+    """)
+    db.commit()
+
+
+def migrate_advance_tables(cursor, db):
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pocket_money_entries (
+            id SERIAL PRIMARY KEY,
+            worker_id TEXT NOT NULL,
+            amount NUMERIC(10,2) NOT NULL,
+            entry_date DATE NOT NULL DEFAULT CURRENT_DATE,
+            note TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (worker_id) REFERENCES workers(id)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS worker_debts (
+            id SERIAL PRIMARY KEY,
+            worker_id TEXT NOT NULL,
+            debt_amount NUMERIC(10,2) NOT NULL,
+            debt_date DATE NOT NULL DEFAULT CURRENT_DATE,
+            reason TEXT,
+            remaining_balance NUMERIC(10,2) NOT NULL,
+            status TEXT NOT NULL DEFAULT 'open',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (worker_id) REFERENCES workers(id)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS debt_recoveries (
+            id SERIAL PRIMARY KEY,
+            debt_id INTEGER NOT NULL,
+            worker_id TEXT NOT NULL,
+            salary_record_id INTEGER,
+            recovery_amount NUMERIC(10,2) NOT NULL,
+            recovery_date DATE NOT NULL DEFAULT CURRENT_DATE,
+            note TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (debt_id) REFERENCES worker_debts(id),
+            FOREIGN KEY (worker_id) REFERENCES workers(id),
+            FOREIGN KEY (salary_record_id) REFERENCES salary_records(id)
+        )
+    """)
+
     db.commit()
 
 
@@ -558,4 +727,7 @@ def migrate_customer_vehicles(cursor, db):
 
 
 def init_app(app):
-    app.teardown_appcontext(close_neon_db)
+    app.teardown_appcontext(close_db)
+
+    with app.app_context():
+        init_db()

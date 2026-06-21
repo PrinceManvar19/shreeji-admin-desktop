@@ -69,6 +69,40 @@ def search_bookings(query=None, date=None, status=None):
     return [row_to_booking(row) for row in rows]
 
 
+def search_bookings_local(query=None, date=None, status=None):
+    from db_local import local_query
+
+    normalized_query = (query or "").strip().lower()
+    normalized_date = (date or "").strip() or None
+    normalized_status = (status or "").strip().lower() or None
+    search_term = f"%{normalized_query}%"
+
+    rows = local_query("""
+        SELECT booking_id, customer_id, name, phone, vehicle, brand_model,
+               service, date, status, created_at, checked_in_at, completed_at,
+               actual_visit_date, is_rescheduled, whatsapp_sent,
+               msg_approved_sent, msg_rejected_sent, msg_checkedin_sent,
+               msg_completed_sent, service_reminder_sent,
+               reminder_sent_at, reminder_snooze_until, source
+        FROM cache_bookings
+        WHERE (? = '' OR
+               LOWER(booking_id) LIKE ? OR
+               LOWER(COALESCE(customer_id,'')) LIKE ? OR
+               LOWER(COALESCE(phone,'')) LIKE ? OR
+               LOWER(COALESCE(vehicle,'')) LIKE ?)
+        AND (? IS NULL OR status = ?)
+        AND (? IS NULL OR date = ?)
+        ORDER BY COALESCE(created_at, checked_in_at, date, '') DESC
+        LIMIT 50
+    """, (
+        normalized_query,
+        search_term, search_term, search_term, search_term,
+        normalized_status, normalized_status,
+        normalized_date, normalized_date,
+    ))
+    return [row_to_booking(row) for row in rows]
+
+
 def get_today_bookings(today_date):
     rows = query_dict(
         f"""
@@ -83,11 +117,44 @@ def get_today_bookings(today_date):
     return [row_to_booking(row) for row in rows]
 
 
+def get_today_bookings_local(today_date):
+    from db_local import local_query
+
+    rows = local_query("""
+        SELECT booking_id, customer_id, name, phone, vehicle, brand_model,
+               service, date, status, created_at, checked_in_at, completed_at,
+               actual_visit_date, is_rescheduled, whatsapp_sent,
+               msg_approved_sent, msg_rejected_sent, msg_checkedin_sent,
+               msg_completed_sent, service_reminder_sent,
+               reminder_sent_at, reminder_snooze_until, source
+        FROM cache_bookings
+        WHERE date = ? OR actual_visit_date = ?
+        ORDER BY COALESCE(created_at, checked_in_at, date, '') DESC
+        LIMIT 50
+    """, (today_date, today_date))
+    return [row_to_booking(row) for row in rows]
+
+
 def get_booking_by_id(booking_id):
     row = query_dict_one(
         f"SELECT {BOOKING_COLUMNS} FROM bookings WHERE booking_id = %s",
         (booking_id,),
     )
+    return row_to_booking(row) if row else None
+
+
+def get_booking_by_id_local(booking_id):
+    from db_local import local_query_one
+
+    row = local_query_one("""
+        SELECT booking_id, customer_id, name, phone, vehicle, brand_model,
+               service, date, status, created_at, checked_in_at, completed_at,
+               actual_visit_date, is_rescheduled, whatsapp_sent,
+               msg_approved_sent, msg_rejected_sent, msg_checkedin_sent,
+               msg_completed_sent, service_reminder_sent,
+               reminder_sent_at, reminder_snooze_until, source
+        FROM cache_bookings WHERE booking_id = ?
+    """, (booking_id,))
     return row_to_booking(row) if row else None
 
 

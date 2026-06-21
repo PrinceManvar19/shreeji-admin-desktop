@@ -1,0 +1,470 @@
+{% extends "admin_base.html" %}
+{% block title %}Slot Management - Shreeji Auto Services{% endblock %}
+
+{% block extra_head %}
+<style>
+  .slot-toolbar {
+    display: flex;
+    align-items: flex-end;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+  }
+
+  .slot-toolbar .dash-form-group {
+    flex: 1 1 220px;
+  }
+
+  .slot-toolbar-actions {
+    flex: 0 0 auto;
+  }
+
+  .slot-action-cell {
+    width: 92px;
+  }
+
+  .slot-edit-button {
+    width: 38px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(162, 4, 5, 0.22);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--accent);
+    cursor: pointer;
+    transition: background var(--transition), border-color var(--transition), color var(--transition), transform var(--transition);
+  }
+
+  .slot-edit-button:hover,
+  .slot-edit-button:focus-visible {
+    background: rgba(162, 4, 5, 0.08);
+    border-color: rgba(162, 4, 5, 0.42);
+    color: var(--accent-dark);
+    transform: translateY(-1px);
+    outline: none;
+  }
+
+  .slot-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.25rem 0.65rem;
+    border-radius: 999px;
+    background: rgba(16, 185, 129, 0.12);
+    color: #047857;
+    font-size: 0.75rem;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .slot-status-pill.closed {
+    background: rgba(239, 68, 68, 0.1);
+    color: #b91c1c;
+  }
+
+  .slot-edit-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+    background: rgba(15, 23, 42, 0.48);
+    backdrop-filter: blur(8px);
+  }
+
+  .slot-edit-backdrop[hidden] {
+    display: none;
+  }
+
+  .slot-edit-modal {
+    width: min(100%, 540px);
+    overflow: hidden;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 18px;
+    background: #fff;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.22);
+  }
+
+  .slot-edit-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem 1.35rem 1rem;
+    border-bottom: 1px solid #eef2f7;
+  }
+
+  .slot-edit-title {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+  }
+
+  .slot-edit-icon {
+    width: 42px;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    border-radius: 8px;
+    background: rgba(162, 4, 5, 0.1);
+    color: var(--accent);
+  }
+
+  .slot-edit-title h3 {
+    margin: 0;
+    color: var(--text-dark);
+    font-family: var(--font-head);
+    font-size: 1.12rem;
+    font-weight: 800;
+  }
+
+  .slot-edit-title p {
+    margin: 0.18rem 0 0;
+    color: #64748b;
+    font-size: 0.84rem;
+    line-height: 1.35;
+  }
+
+  .slot-edit-close {
+    width: 38px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+    color: #475569;
+    cursor: pointer;
+    transition: background var(--transition), border-color var(--transition), color var(--transition);
+  }
+
+  .slot-edit-close:hover,
+  .slot-edit-close:focus-visible {
+    background: #f8fafc;
+    border-color: rgba(162, 4, 5, 0.25);
+    color: var(--accent);
+    outline: none;
+  }
+
+  .slot-edit-body {
+    padding: 1.35rem;
+  }
+
+  .slot-edit-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .slot-summary-item {
+    min-width: 0;
+    padding: 0.8rem;
+    border: 1px solid #eef2f7;
+    border-radius: 8px;
+    background: #f8fafc;
+  }
+
+  .slot-summary-label {
+    display: block;
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .slot-summary-value {
+    display: block;
+    margin-top: 0.22rem;
+    color: #111827;
+    font-family: var(--font-head);
+    font-size: 1.1rem;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .slot-edit-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .slot-edit-grid .dash-form-group.full {
+    grid-column: 1 / -1;
+  }
+
+  .slot-edit-note {
+    margin: 0.2rem 0 0;
+    color: #64748b;
+    font-size: 0.82rem;
+    line-height: 1.45;
+  }
+
+  .slot-edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid #eef2f7;
+  }
+
+  @media (max-width: 640px) {
+    .slot-toolbar {
+      display: grid;
+      grid-template-columns: 1fr;
+    }
+
+    .slot-toolbar-actions,
+    .slot-toolbar-actions .dash-btn-primary,
+    .slot-edit-actions .dash-btn-primary,
+    .slot-edit-actions .dash-btn-secondary {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .slot-edit-summary,
+    .slot-edit-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .slot-edit-actions {
+      flex-direction: column-reverse;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-wrap">
+  <div class="dash-header">
+    <div>
+      <h1 class="dash-title">
+        <i class="fas fa-calendar-alt"></i> Slot Management
+      </h1>
+      <p class="dash-sub">Set daily capacity and review available service slots.</p>
+    </div>
+  </div>
+
+  <div class="dash-card">
+    <h2 class="dash-card-title">
+      <i class="fas fa-calendar-alt"></i> Slot Management
+    </h2>
+
+    <form method="POST" action="/admin/set-slots" class="dash-form">
+      <div class="slot-toolbar">
+        <div class="dash-form-group">
+          <label>Date</label>
+          <input type="date" name="date" id="slotDate" value="{{ today }}" required />
+        </div>
+        <div class="dash-form-group">
+          <label>Total Slots Available</label>
+          <input type="number" name="slots" min="0" max="50" placeholder="e.g. 5" required />
+        </div>
+        <div class="dash-form-group slot-toolbar-actions">
+          <button type="submit" class="dash-btn-primary" style="margin-top:0;" data-loading-submit data-loading-text="Saving...">
+            <i class="fas fa-save"></i> Set Slots
+          </button>
+        </div>
+      </div>
+    </form>
+
+    <div class="table-responsive dash-table-wrap" style="margin-top:1.5rem;">
+      <table class="dash-table">
+        <thead>
+          <tr><th>Date</th><th>Total Slots</th><th>Booked</th><th>Available</th><th>Status</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% if slots %}
+            {% for date, slot in slots|dictsort(reverse=true) %}
+            {% set available = slot.total - slot.booked %}
+            {% set modal_id = 'edit-slot-' ~ loop.index %}
+            {% set is_closed = available <= 0 %}
+            <tr>
+              <td>{{ slot.formatted_date or date }}</td>
+              <td>{{ slot.total }}</td>
+              <td>{{ slot.booked }}</td>
+              <td>
+                <span class="slot-badge{% if available <= 0 %} slot-full{% endif %}">{{ available }}</span>
+              </td>
+              <td>
+                <span class="slot-status-pill{% if is_closed %} closed{% endif %}">
+                  <i class="fas {% if is_closed %}fa-lock{% else %}fa-circle-check{% endif %}"></i>
+                  {% if is_closed %}Closed{% else %}Open{% endif %}
+                </span>
+              </td>
+              <td class="slot-action-cell">
+                <button type="button" class="slot-edit-button" data-slot-modal-open="{{ modal_id }}" aria-label="Edit slot for {{ slot.formatted_date or date }}" title="Edit slot">
+                  <i class="fas fa-pen"></i>
+                </button>
+                <div class="slot-edit-backdrop" id="{{ modal_id }}" hidden data-slot-modal>
+                  <div class="slot-edit-modal" role="dialog" aria-modal="true" aria-labelledby="{{ modal_id }}-title">
+                    <div class="slot-edit-header">
+                      <div class="slot-edit-title">
+                        <span class="slot-edit-icon"><i class="fas fa-pen-to-square"></i></span>
+                        <div>
+                          <h3 id="{{ modal_id }}-title">Edit Slot</h3>
+                          <p>{{ slot.formatted_date or date }} schedule and booking capacity.</p>
+                        </div>
+                      </div>
+                      <button type="button" class="slot-edit-close" data-slot-modal-close aria-label="Close edit slot form">
+                        <i class="fas fa-xmark"></i>
+                      </button>
+                    </div>
+
+                    <form method="POST" action="{{ url_for('admin.edit_slot', slot_id=date) }}" class="dash-form slot-edit-body">
+                      <div class="slot-edit-summary" aria-label="Current slot summary">
+                        <div class="slot-summary-item">
+                          <span class="slot-summary-label">Total</span>
+                          <span class="slot-summary-value">{{ slot.total }}</span>
+                        </div>
+                        <div class="slot-summary-item">
+                          <span class="slot-summary-label">Booked</span>
+                          <span class="slot-summary-value">{{ slot.booked }}</span>
+                        </div>
+                        <div class="slot-summary-item">
+                          <span class="slot-summary-label">Available</span>
+                          <span class="slot-summary-value">{{ available }}</span>
+                        </div>
+                      </div>
+
+                      <div class="slot-edit-grid">
+                        <div class="dash-form-group">
+                          <label>Date</label>
+                          <input type="date" name="date" value="{{ date }}" required />
+                        </div>
+                        <div class="dash-form-group">
+                          <label>Time</label>
+                          <input type="time" name="time" value="{{ slot.time or '' }}" />
+                        </div>
+                        <div class="dash-form-group">
+                          <label>Max Bookings</label>
+                          <input type="number" name="max_bookings" min="{{ slot.booked }}" max="50" value="{{ slot.total }}" required data-slot-capacity />
+                        </div>
+                        <div class="dash-form-group">
+                          <label>Status</label>
+                          <select name="status" data-slot-status data-booked-count="{{ slot.booked }}">
+                            <option value="open" {% if not is_closed %}selected{% endif %}>Open for booking</option>
+                            <option value="closed" {% if is_closed %}selected{% endif %}>Close at booked count</option>
+                          </select>
+                        </div>
+                        <div class="dash-form-group full">
+                          <p class="slot-edit-note">
+                            Capacity cannot be lower than the {{ slot.booked }} booked appointment{% if slot.booked != 1 %}s{% endif %}. Closing the slot keeps existing bookings and sets available slots to 0.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div class="slot-edit-actions">
+                        <button type="button" class="dash-btn-secondary" data-slot-modal-close>Cancel</button>
+                        <button type="submit" class="dash-btn-primary" style="margin-top:0;" data-loading-submit data-loading-text="Saving...">
+                          <i class="fas fa-save"></i> Save Changes
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="6" class="dash-empty">No slot data available.</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    let activeSlotModal = null;
+
+    function closeSlotModal(modal) {
+      if (!modal) {
+        return;
+      }
+
+      modal.hidden = true;
+      document.body.classList.remove('modal-open');
+      if (activeSlotModal === modal) {
+        activeSlotModal = null;
+      }
+    }
+
+    function openSlotModal(modalId) {
+      const modal = document.getElementById(modalId);
+      if (!modal) {
+        return;
+      }
+
+      if (activeSlotModal && activeSlotModal !== modal) {
+        closeSlotModal(activeSlotModal);
+      }
+
+      modal.hidden = false;
+      activeSlotModal = modal;
+      document.body.classList.add('modal-open');
+
+      const firstInput = modal.querySelector('input, select, button');
+      if (firstInput) {
+        firstInput.focus();
+      }
+    }
+
+    document.querySelectorAll('[data-slot-modal-open]').forEach((button) => {
+      button.addEventListener('click', () => openSlotModal(button.dataset.slotModalOpen));
+    });
+
+    document.querySelectorAll('[data-slot-modal]').forEach((modal) => {
+      modal.addEventListener('click', (event) => {
+        if (event.target === modal || event.target.closest('[data-slot-modal-close]')) {
+          closeSlotModal(modal);
+        }
+      });
+
+      const statusSelect = modal.querySelector('[data-slot-status]');
+      const capacityInput = modal.querySelector('[data-slot-capacity]');
+      if (!statusSelect || !capacityInput) {
+        return;
+      }
+
+      const originalCapacity = capacityInput.value;
+      const bookedCount = Number(statusSelect.dataset.bookedCount || 0);
+
+      function syncCapacityWithStatus() {
+        if (statusSelect.value === 'closed') {
+          capacityInput.value = bookedCount;
+          capacityInput.readOnly = true;
+        } else {
+          capacityInput.readOnly = false;
+          if (Number(capacityInput.value) <= bookedCount && Number(originalCapacity) > bookedCount) {
+            capacityInput.value = originalCapacity;
+          }
+        }
+      }
+
+      statusSelect.addEventListener('change', syncCapacityWithStatus);
+      syncCapacityWithStatus();
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && activeSlotModal) {
+        closeSlotModal(activeSlotModal);
+      }
+    });
+  });
+</script>
+{% endblock %}

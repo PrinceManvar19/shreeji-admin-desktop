@@ -84,6 +84,12 @@ def get_slots_for_admin():
     }
 
 
+def get_slots_for_admin_local():
+    from models.slot_model import get_slots_map_local
+
+    return get_slots_map_local()
+
+
 def get_slot_availability(date):
     slot = get_slot(date)
     return _build_slot_info(slot)

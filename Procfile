@@ -1,1 +1,2 @@
-web: gunicorn app_public:app --timeout 60 --workers 2 --preload
+# This repo is not deployed. No Procfile needed.
+# To build the .exe run: pyinstaller ShreejiAdmin.spec --noconfirm
