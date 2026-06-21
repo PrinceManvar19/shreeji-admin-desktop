@@ -15,7 +15,6 @@ from models.booking_model import (
     update_booking_status,
 )
 from models.customer_model import get_customer_by_id, get_customer_map
-from models.customer_model import get_customer_map_local
 from services.slot_service import get_slot_availability
 from utils.constants import (
     STATUS_APPROVED,
@@ -368,19 +367,6 @@ def get_admin_bookings(filters=None):
     ]
 
 
-def get_admin_bookings_local(filters=None):
-    from models.booking_model import search_bookings_local
-
-    filters = filters or {}
-    bookings = search_bookings_local(
-        query=filters.get("query"),
-        date=filters.get("date"),
-        status=filters.get("status"),
-    )
-    customer_map = get_customer_map_local()
-    return [enrich_booking(booking, customer_map) for booking in bookings]
-
-
 def get_today_bookings(today_date, customer_map=None):
     if customer_map is None:
         customer_map = get_customer_map()
@@ -389,13 +375,6 @@ def get_today_bookings(today_date, customer_map=None):
         enrich_booking(booking, customer_map)
         for booking in fetch_today_bookings(today_date)
     ]
-
-
-def get_today_bookings_local(today_date):
-    from models.booking_model import get_today_bookings_local as fetch_local
-
-    customer_map = get_customer_map_local()
-    return [enrich_booking(booking, customer_map) for booking in fetch_local(today_date)]
 
 
 def get_booking_stats(bookings):
@@ -419,11 +398,6 @@ def get_booking_stats(bookings):
 
 def get_today_stats(today_date):
     bookings = get_today_bookings(today_date)
-    return get_booking_stats(bookings)
-
-
-def get_today_stats_local(today_date):
-    bookings = get_today_bookings_local(today_date)
     return get_booking_stats(bookings)
 
 

@@ -1,35 +1,7 @@
 from db_neon import query_dict, query_dict_one, execute_query
-from utils.constants import ACTIVE_SLOT_STATUSES
-
-
 def get_slots_map():
     rows = query_dict("SELECT date, total FROM slots ORDER BY date DESC")
     return {row["date"]: {"total": row["total"]} for row in rows}
-
-
-def get_slots_map_local():
-    from db_local import local_query
-
-    placeholders = ", ".join(["?"] * len(ACTIVE_SLOT_STATUSES))
-    rows = local_query(f"""
-        SELECT s.date, s.total,
-               COUNT(b.booking_id) AS booked
-        FROM cache_slots s
-        LEFT JOIN cache_bookings b
-            ON b.date = s.date
-            AND b.status IN ({placeholders})
-            AND COALESCE(b.source, '') != 'direct_walkin'
-        GROUP BY s.date, s.total
-        ORDER BY s.date DESC
-    """, ACTIVE_SLOT_STATUSES)
-    return {
-        row["date"]: {
-            "total": row["total"],
-            "booked": int(row["booked"] or 0),
-            "available": max(0, row["total"] - int(row["booked"] or 0)),
-        }
-        for row in rows
-    }
 
 
 def get_slot(date):

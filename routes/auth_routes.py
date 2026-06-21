@@ -1,4 +1,4 @@
-from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 
 from models.customer_model import create_customer, find_customer
 from services.auth_service import login_user_by_identifier, set_user_session
@@ -19,11 +19,6 @@ def login():
                 set_user_session(user["id"], user["name"], user["role"], user.get("phone", ""))
                 flash("Login successful!", "success")
 
-                if user["role"] == "admin":
-                    if "admin.admin" not in current_app.view_functions:
-                        session.clear()
-                        return redirect(url_for("auth.admin_info"))
-                    return redirect(url_for("admin.admin"))
                 return redirect(url_for("customer.dashboard"))
 
         except Exception as error:
@@ -32,11 +27,6 @@ def login():
         flash("Invalid credentials. Please check and try again.", "error")
 
     return render_template("login.html")
-
-
-@auth_bp.route("/admin-info")
-def admin_info():
-    return render_template("admin_info.html")
 
 
 @auth_bp.route("/register", methods=["GET", "POST"])

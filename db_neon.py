@@ -113,15 +113,6 @@ def _create_tables(cursor, db):
     """)
 
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS admins (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            phone TEXT,
-            password_hash TEXT
-        )
-    """)
-
-    cursor.execute("""
         CREATE TABLE IF NOT EXISTS bookings (
             booking_id TEXT PRIMARY KEY,
             customer_id TEXT,
@@ -150,6 +141,18 @@ def _create_tables(cursor, db):
         CREATE TABLE IF NOT EXISTS slots (
             date TEXT PRIMARY KEY,
             total INTEGER NOT NULL DEFAULT 0
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id SERIAL PRIMARY KEY,
+            booking_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            performed_by TEXT,
+            performed_by_id TEXT,
+            details TEXT DEFAULT '{}',
+            created_at TEXT NOT NULL
         )
     """)
 
@@ -240,7 +243,6 @@ def init_neon_db():
             migrate_json_data(cursor, db)
             _mark_migrations_done(cursor, db)
 
-        seed_admins(cursor, db)
         db_ready = True
 
     except psycopg2.Error as e:
@@ -286,36 +288,6 @@ def start_background_init(app):
         )
         _db_init_thread.start()
         return _db_init_thread
-
-
-def seed_admins(cursor, db):
-    owner_phone = os.getenv("GARAGE_OWNER_PHONE", "").strip()
-    cursor.execute("""
-        INSERT INTO admins (id, name, phone)
-        VALUES (%s, %s, %s)
-        ON CONFLICT (id) DO UPDATE SET
-            name = EXCLUDED.name,
-            phone = CASE
-                WHEN EXCLUDED.phone <> '' THEN EXCLUDED.phone
-                ELSE admins.phone
-            END
-    """, (
-        "ADMIN001",
-        "Owner",
-        owner_phone
-    ))
-
-    cursor.execute("""
-        INSERT INTO admins (id, name, phone)
-        VALUES (%s, %s, %s)
-        ON CONFLICT (id) DO NOTHING
-    """, (
-        "ADMIN002",
-        "Manager",
-        ""
-    ))
-
-    db.commit()
 
 
 def _load_json_file(path, default):

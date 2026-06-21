@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify
 
 from db_neon import init_app as init_db_app
-from db_local import init_local_db
 from routes.auth_routes import auth_bp
 from routes.customer_routes import customer_bp
 from routes.main_routes import main_bp
@@ -106,12 +105,6 @@ def create_app():
 
     app.config["UPLOAD_FOLDER"] = "static/uploads"
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
-
-    try:
-        init_local_db()
-        print("Local SQLite database initialised.", flush=True)
-    except Exception as error:
-        print(f"WARNING: Local SQLite init failed: {error}", flush=True)
 
     config_error = database_url_error(database_url)
     if config_error:
