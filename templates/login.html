@@ -14,22 +14,25 @@
     </h2>
 
     <p class="auth-subtitle">
-      Already visited us before? Your phone number is already registered — just enter it below.<br>
+      Already visited us before? Your phone number is already registered - just enter it below.<br>
       Admin/Staff: enter your Admin ID (e.g. ADMIN001) or registered phone number.
     </p>
 
-    <form method="POST" action="/login" class="auth-form" id="loginForm">
-      <label class="form-label" for="loginIdentifier">Phone Number, Customer ID, or Admin ID *</label>
-      <input type="text" class="form-control auth-input" id="loginIdentifier" name="identifier" placeholder="9876543210, CUST1001, or ADMIN001" required data-trim>
-      <div class="invalid-feedback" id="loginIdentifierError" style="display:none; color:#dc3545; font-size:0.875rem; margin-top:0.25rem;"></div>
+    {# Admin email OTP login is temporarily disabled. #}
+      <form method="POST" action="/login" class="auth-form" id="loginForm">
+        <input type="hidden" name="form_action" value="login">
+        <label class="form-label" for="loginIdentifier">Phone Number, Customer ID, or Admin ID *</label>
+        <input type="text" class="form-control auth-input" id="loginIdentifier" name="identifier" placeholder="9876543210, CUST1001, or ADMIN001" required data-trim>
+        <div class="invalid-feedback" id="loginIdentifierError" style="display:none; color:#dc3545; font-size:0.875rem; margin-top:0.25rem;"></div>
 
-      <button type="submit" class="btn btn-primary w-100 auth-btn" data-loading-submit="true" data-loading-text="Logging in...">
-        Continue to Dashboard
-      </button>
-    </form>
+        <button type="submit" class="btn btn-primary w-100 auth-btn" data-loading-submit="true" data-loading-text="Logging in...">
+          Continue to Dashboard
+        </button>
+      </form>
 
 
-    <p style="text-align:center;margin-top:1rem;font-size:0.9em;color:#666;">New customer? <a href="/register" style="color:#007bff;font-weight:500;">Create your account →</a></p>
+
+    <p style="text-align:center;margin-top:1rem;font-size:0.9em;color:#666;">New customer? <a href="/register" style="color:#007bff;font-weight:500;">Create your account -&gt;</a></p>
   </div>
 </div>
 {% endblock %}
@@ -40,6 +43,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const loginForm = document.getElementById('loginForm');
   const identifierInput = document.getElementById('loginIdentifier');
   const identifierError = document.getElementById('loginIdentifierError');
+
+  if (!loginForm) { return; }
 
   loginForm.addEventListener('submit', function(event) {
     identifierError.style.display = 'none';
@@ -68,3 +73,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
+
+
+

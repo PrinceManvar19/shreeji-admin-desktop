@@ -104,7 +104,13 @@ def create_app():
 
     app = Flask(__name__)
 
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', os.urandom(24).hex())
+    secret_key = os.environ.get("SECRET_KEY")
+    if not secret_key:
+        raise RuntimeError(
+            "SECRET_KEY environment variable is not set. "
+            "Set it in Railway environment variables or .env file before starting."
+        )
+    app.config["SECRET_KEY"] = secret_key
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
     app.config["SESSION_COOKIE_SECURE"] = False
     app.config["SESSION_COOKIE_HTTPONLY"] = True

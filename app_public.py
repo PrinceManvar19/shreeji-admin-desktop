@@ -5,6 +5,7 @@ from flask import Flask, jsonify
 
 from db_neon import init_app as init_db_app
 from db_local import init_local_db
+from routes.admin_routes import admin_bp
 from routes.auth_routes import auth_bp
 from routes.customer_routes import customer_bp
 from routes.main_routes import main_bp
@@ -102,7 +103,13 @@ def create_app():
 
     app = Flask(__name__)
 
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', os.urandom(24).hex())
+    secret_key = os.environ.get("SECRET_KEY")
+    if not secret_key:
+        raise RuntimeError(
+            "SECRET_KEY environment variable is not set. "
+            "Set it in Railway environment variables or .env file before starting."
+        )
+    app.config["SECRET_KEY"] = secret_key
 
     app.config["UPLOAD_FOLDER"] = "static/uploads"
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
@@ -141,6 +148,7 @@ def create_app():
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(customer_bp)
+    app.register_blueprint(admin_bp)
 
     @app.route("/health")
     def health_check():

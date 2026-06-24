@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Admin - Shreeji Auto Service{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <style>
+    body { background: #f5f6f8; color: #1f2937; }
+    .admin-shell { min-height: 100vh; }
+    .admin-sidebar { width: 248px; background: #111827; }
+    .admin-content { padding: 1rem; padding-bottom: 5.5rem; }
+    .admin-nav-link { color: rgba(255,255,255,.72); border-radius: .5rem; font-weight: 600; }
+    .admin-nav-link:hover, .admin-nav-link.active { color: #fff; background: rgba(220,38,38,.25); }
+    .mobile-tabs { box-shadow: 0 -8px 24px rgba(15,23,42,.12); }
+    .mobile-tabs .nav-link { color: #4b5563; font-size: .72rem; }
+    .mobile-tabs .nav-link.active { color: #b91c1c; }
+    .metric-card { border: 0; border-radius: .75rem; box-shadow: 0 8px 22px rgba(15,23,42,.07); }
+    .table-card, .form-card { border: 0; border-radius: .75rem; box-shadow: 0 8px 22px rgba(15,23,42,.07); }
+    .page-title { font-weight: 800; letter-spacing: 0; }
+    @media (min-width: 992px) {
+      .admin-content { margin-left: 248px; padding: 1.5rem; padding-bottom: 1.5rem; }
+      .admin-sidebar { position: fixed; inset: 0 auto 0 0; }
+    }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  {% set tabs = [
+    ('admin.admin', 'fa-gauge-high', 'Dashboard'),
+    ('admin.admin_slots', 'fa-calendar-days', 'Slots'),
+    ('admin.admin_checkin_page', 'fa-circle-check', 'Check-In'),
+    ('admin.admin_bookings', 'fa-clipboard-list', 'Requests'),
+    ('admin.admin_walkin', 'fa-person-walking-arrow-right', 'Walk-in')
+  ] %}
+  <div class="admin-shell">
+    <aside class="admin-sidebar d-none d-lg-flex flex-column p-3 text-white">
+      <a href="{{ url_for('admin.admin') }}" class="d-flex align-items-center gap-2 mb-4 text-white text-decoration-none">
+        <img src="{{ url_for('static', filename='images/logo1.png') }}" alt="Shreeji" width="42" height="42">
+        <span class="fw-bold">Shreeji Admin</span>
+      </a>
+      <nav class="nav nav-pills flex-column gap-1">
+        {% for endpoint, icon, label in tabs %}
+          <a class="nav-link admin-nav-link {% if request.endpoint == endpoint %}active{% endif %}" href="{{ url_for(endpoint) }}">
+            <i class="fa-solid {{ icon }} me-2"></i>{{ label }}
+          </a>
+        {% endfor %}
+      </nav>
+      <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-light mt-auto">Logout</a>
+    </aside>
+
+    <main class="admin-content">
+      <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+        <div>
+          <div class="text-uppercase text-secondary small fw-bold">Shreeji Auto Service</div>
+          <h1 class="h4 page-title mb-0">{% block page_title %}Admin{% endblock %}</h1>
+        </div>
+        <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-secondary btn-sm d-lg-none">Logout</a>
+      </div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ 'success' if category == 'success' else 'danger' if category == 'error' else 'warning' }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <nav class="mobile-tabs fixed-bottom bg-white border-top d-lg-none">
+    <div class="nav nav-pills nav-fill">
+      {% for endpoint, icon, label in tabs %}
+        <a class="nav-link py-2 {% if request.endpoint == endpoint %}active bg-transparent{% endif %}" href="{{ url_for(endpoint) }}">
+          <i class="fa-solid {{ icon }} d-block mb-1"></i>{{ label }}
+        </a>
+      {% endfor %}
+    </div>
+  </nav>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

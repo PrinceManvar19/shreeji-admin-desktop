@@ -1,0 +1,35 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Walk-in Entry - Shreeji Admin{% endblock %}
+{% block page_title %}Walk-in Entry{% endblock %}
+{% block content %}
+<div class="card form-card">
+  <div class="card-body">
+    <form method="post" class="row g-3">
+      <input type="hidden" name="no_slot_walkin" value="on">
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="name">Customer Name</label>
+        <input class="form-control" id="name" name="name" required>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="phone">Phone</label>
+        <input class="form-control" id="phone" name="phone" inputmode="numeric" maxlength="10" required>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="vehicle_number">Vehicle Number</label>
+        <input class="form-control text-uppercase" id="vehicle_number" name="vehicle_number" required>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="brand_model">Brand / Model</label>
+        <input class="form-control" id="brand_model" name="brand_model" required>
+      </div>
+      <div class="col-12">
+        <label class="form-label" for="service">Service</label>
+        <input class="form-control" id="service" name="service" placeholder="General service, repair, oil change" required>
+      </div>
+      <div class="col-12">
+        <button class="btn btn-danger w-100 w-md-auto" type="submit">Create Walk-in Booking</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -10,6 +10,9 @@ auth_bp = Blueprint("auth", __name__)
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
+    # Admin email OTP is temporarily disabled for now.
+    session.pop("admin_otp", None)
+
     if request.method == "POST":
         identifier = request.form.get("identifier", "").strip()
         try:
@@ -28,7 +31,7 @@ def login():
 
         except Exception as error:
             log_action("LOGIN ROUTE ERROR", f"{identifier}: {str(error)}")
-        
+
         flash("Invalid credentials. Please check and try again.", "error")
 
     return render_template("login.html")

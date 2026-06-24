@@ -1,0 +1,44 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Check-In - Shreeji Admin{% endblock %}
+{% block page_title %}Check-In{% endblock %}
+{% block content %}
+<div class="card form-card mb-3">
+  <div class="card-body">
+    <form method="post" class="row g-2">
+      <div class="col-12 col-md">
+        <input class="form-control" name="q" value="{{ search_term }}" placeholder="Booking ID or phone number" required>
+      </div>
+      <div class="col-12 col-md-auto">
+        <button class="btn btn-danger w-100" type="submit">Search</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if search_term and not results %}
+  <div class="alert alert-warning">No booking found for {{ search_term }}.</div>
+{% endif %}
+
+<div class="row g-3">
+  {% for booking in results %}
+    <div class="col-12 col-lg-6">
+      <div class="card table-card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between gap-3">
+            <div>
+              <h2 class="h6 fw-bold mb-1">{{ booking.booking_id }}</h2>
+              <div class="text-secondary">{{ booking.name }} · {{ booking.phone }}</div>
+              <div>{{ booking.vehicle }} {% if booking.brand_model %}· {{ booking.brand_model }}{% endif %}</div>
+              <div class="small text-secondary">{{ booking.service }} · {{ booking.formatted_date or booking.date }}</div>
+            </div>
+            <span class="badge text-bg-secondary align-self-start">{{ booking.status_display or booking.status }}</span>
+          </div>
+          <form method="post" action="{{ url_for('admin.admin_checkin_booking', booking_id=booking.booking_id) }}" class="mt-3">
+            <button class="btn btn-danger w-100" type="submit" {% if booking.status == 'checked_in' or booking.status == 'completed' %}disabled{% endif %}>Check In</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Slot Management - Shreeji Admin{% endblock %}
+{% block page_title %}Slot Management{% endblock %}
+{% block content %}
+<div class="card table-card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Date</th>
+            <th>Booked</th>
+            <th>Available</th>
+            <th class="text-end">Total Slots</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for slot in slots %}
+            <tr>
+              <td class="fw-semibold">{{ slot.formatted_date }}</td>
+              <td>{{ slot.booked }}</td>
+              <td>{{ slot.available }}</td>
+              <td>
+                <form class="d-flex justify-content-end gap-2" method="post" action="{{ url_for('admin.set_slots') }}">
+                  <input type="hidden" name="date" value="{{ slot.date }}">
+                  <input class="form-control form-control-sm" style="max-width: 92px" type="number" min="{{ slot.booked }}" name="slots" value="{{ slot.total }}" aria-label="Total slots for {{ slot.formatted_date }}">
+                  <button class="btn btn-sm btn-danger" type="submit">Save</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

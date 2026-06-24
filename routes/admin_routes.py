@@ -23,6 +23,7 @@ from services.booking_service import (
     get_admin_bookings_local,
     get_booking_by_id,
     get_booking_stats,
+    get_today_bookings,
     get_today_bookings_local,
 )
 from services.service_reminder_service import (
@@ -44,7 +45,7 @@ from models.customer_model import (
     get_customer_with_vehicles,
     search_customers,
 )
-from utils.helpers import format_date_display, format_datetime_display, get_today_date_string, log_action
+from utils.helpers import format_date_display, format_datetime_display, get_next_days, get_today_date_string, log_action
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -103,105 +104,54 @@ def admin():
     admin_guard = _require_admin()
     if admin_guard is not None:
         return admin_guard
-    _refresh_cache_if_stale()
-    
+
     today = get_today_date_string()
-    filters = {
-        "date": request.args.get("date", ""),
-        "status": request.args.get("status", ""),
-        "query": request.args.get("query", "")
-    }
-    
-    bookings = get_admin_bookings_local(filters)
+    bookings = get_admin_bookings({})
     stats = get_booking_stats(bookings)
-    
-    total_bookings = stats.get('total', 0)
-    pending_count = stats.get('pending', 0)
-    completed_count = stats.get('completed', 0)
-    
-    # Today control panel data
-    today_bookings = [
-        b for b in bookings
-        if b.get("date") == today
-    ]
+    today_bookings = get_today_bookings(today)
     today_stats = get_booking_stats(today_bookings)
-    service_due_count = due_reminder_count_local()
-    
-    # Garage vehicles (checked_in)
-    vehicles_in_garage = [b for b in bookings if b.get("status") == STATUS_CHECKED_IN]
-    
-    # Today's approved appointments
-    today_appointments = [b for b in bookings if b.get("date") == today and b.get("status") == STATUS_APPROVED]
-    late_arrival_bookings = [
-        b for b in bookings
-        if b.get("status") == STATUS_APPROVED and b.get("date") != today
-    ]
-    
-    slots = get_slots_for_admin_local()
-    
-    last_7_days_data = _build_last_7_days_data(bookings)
-    
-    # Check-in booking data
-    checkin_booking_id = request.args.get("checkin_id", "")
-    booking_data = get_booking_by_id_local(checkin_booking_id) if checkin_booking_id else None
-    
-    return render_template("admin.html", 
-                         bookings=bookings,
-                         stats=stats,
-                         total_bookings=total_bookings,
-                         pending_count=pending_count,
-                         approved_count=stats.get('approved', 0),
-                         completed_count=completed_count,
-                         rejected_count=stats.get('rejected', 0),
-                         vehicles_in_garage=vehicles_in_garage,
-                         today_appointments=today_appointments,
-                         today_approved=today_appointments,
-                         today=today,
-                         today_display=format_date_display(today),
-                         slots=slots,
-                         booking_data=booking_data,
-                         verified_checkin_booking=booking_data,
-                         filters=filters,
-                         last_7_days_data=last_7_days_data,
-                         today_bookings=today_bookings,
-                         late_arrival_bookings=late_arrival_bookings,
-                         today_stats=today_stats,
-                         service_due_count=service_due_count)
+
+    return render_template(
+        "admin/dashboard.html",
+        stats=stats,
+        today_stats=today_stats,
+        pending_count=stats.get("pending", 0),
+        approved_count=stats.get("approved", 0),
+        checked_in_count=stats.get("checked_in", 0),
+        completed_today_count=today_stats.get("completed", 0),
+        today=today,
+        today_display=format_date_display(today),
+    )
 
 
-@admin_bp.route("/checkin")
+@admin_bp.route("/checkin", methods=["GET", "POST"])
 def admin_checkin_page():
     admin_guard = _require_admin()
     if admin_guard is not None:
         return admin_guard
-    _refresh_cache_if_stale()
-    
-    today = get_today_date_string()
-    
-    all_relevant = get_admin_bookings_local({})
-    today_queue = [
-        b for b in all_relevant
-        if b.get("date") == today and b.get("status") == STATUS_APPROVED
-    ]
-    vehicles_in_garage = [
-        b for b in all_relevant
-        if b.get("status") == STATUS_CHECKED_IN
-    ]
-    
-    # Verify booking
+
+    search_term = (
+        request.form.get("q", "")
+        if request.method == "POST"
+        else request.args.get("q", request.args.get("booking_id", ""))
+    ).strip()
     booking_data = None
-    checkin_booking_id = ""
-    if request.method == "POST" or request.args.get("booking_id"):
-        checkin_booking_id = request.form.get("booking_id") or request.args.get("booking_id", "")
-        if checkin_booking_id:
-            booking_data = get_booking_by_id_local(checkin_booking_id)
-    
-    return render_template("checkin.html", 
-                          today=today,
-                          today_queue=today_queue,
-                          vehicles_in_garage=vehicles_in_garage,
-                          booking_data=booking_data,
-                          checkin_booking_id=checkin_booking_id)
+    results = []
+
+    if search_term:
+        booking_data = get_booking_by_id(search_term.upper())
+        if booking_data:
+            results = [booking_data]
+        else:
+            results = get_admin_bookings({"query": search_term})
+
+    return render_template(
+        "admin/checkin.html",
+        search_term=search_term,
+        booking_data=booking_data,
+        results=results,
+        today=get_today_date_string(),
+    )
 
 
 @admin_bp.route("/checkin/verify", methods=["POST"])
@@ -224,14 +174,18 @@ def admin_slots():
     if admin_guard is not None:
         return admin_guard
 
-    slots = {
-        date: {
-            **slot,
+    slots_map = get_slots_for_admin()
+    slots = []
+    for date in get_next_days(14):
+        slot = slots_map.get(date, {"total": 0, "booked": 0, "available": 0})
+        slots.append({
+            "date": date,
             "formatted_date": format_date_display(date),
-        }
-        for date, slot in get_slots_for_admin_local().items()
-    }
-    return render_template("admin_slots.html", slots=slots, today=get_today_date_string())
+            "total": slot.get("total", 0),
+            "booked": slot.get("booked", 0),
+            "available": slot.get("available", 0),
+        })
+    return render_template("admin/slots.html", slots=slots, today=get_today_date_string())
 
 
 @admin_bp.route("/bookings")
@@ -239,18 +193,11 @@ def admin_bookings():
     admin_guard = _require_admin()
     if admin_guard is not None:
         return admin_guard
-    _refresh_cache_if_stale()
 
-    filters = {
-        "date": request.args.get("date", "").strip(),
-        "status": request.args.get("status", "").strip(),
-        "query": request.args.get("query", "").strip(),
-    }
-    bookings = get_admin_bookings_local(filters)
+    bookings = get_admin_bookings({"status": STATUS_PENDING})
     return render_template(
-        "admin_bookings.html",
+        "admin/booking_requests.html",
         bookings=bookings,
-        filters=filters,
         today=get_today_date_string(),
     )
 
@@ -334,14 +281,7 @@ def admin_walkin():
             fallback = redirect(url_for("admin.admin_walkin"))
             return _redirect_with_whatsapp(booking["booking_id"], booking, fallback)
 
-    slots = {
-        date: {
-            **slot,
-            "formatted_date": format_date_display(date),
-        }
-        for date, slot in get_slots_for_admin_local().items()
-    }
-    return render_template("admin_walkin.html", today=today, slots=slots)
+    return render_template("admin/walkin.html", today=today)
 
 
 @admin_bp.route("/export")
@@ -426,7 +366,7 @@ def edit_slot(slot_id):
     return redirect(url_for("admin.admin_slots"))
 
 
-@admin_bp.route("/approve/<booking_id>")
+@admin_bp.route("/approve/<booking_id>", methods=["GET", "POST"])
 def approve_booking(booking_id):
     admin_guard = _require_admin()
     if admin_guard is not None:
@@ -443,7 +383,7 @@ def approve_booking(booking_id):
     return _redirect_with_whatsapp(booking_id, get_booking_by_id(booking_id) or booking, fallback)
 
 
-@admin_bp.route("/reject/<booking_id>")
+@admin_bp.route("/reject/<booking_id>", methods=["GET", "POST"])
 def reject_booking(booking_id):
     admin_guard = _require_admin()
     if admin_guard is not None:
@@ -460,7 +400,7 @@ def reject_booking(booking_id):
     return _redirect_with_whatsapp(booking_id, get_booking_by_id(booking_id) or booking, fallback)
 
 
-@admin_bp.route("/checkin/<booking_id>")
+@admin_bp.route("/checkin/<booking_id>", methods=["GET", "POST"])
 def admin_checkin_booking(booking_id):
     admin_guard = _require_admin()
     if admin_guard is not None:

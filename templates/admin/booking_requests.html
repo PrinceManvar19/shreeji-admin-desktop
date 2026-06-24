@@ -1,0 +1,36 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Booking Requests - Shreeji Admin{% endblock %}
+{% block page_title %}Booking Requests{% endblock %}
+{% block content %}
+{% if not bookings %}
+  <div class="alert alert-info">No pending booking requests.</div>
+{% endif %}
+
+<div class="row g-3">
+  {% for booking in bookings %}
+    <div class="col-12 col-xl-6">
+      <div class="card table-card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between gap-3">
+            <div>
+              <h2 class="h6 fw-bold mb-1">{{ booking.booking_id }}</h2>
+              <div class="text-secondary">{{ booking.name }} · {{ booking.phone }}</div>
+              <div>{{ booking.vehicle }} {% if booking.brand_model %}· {{ booking.brand_model }}{% endif %}</div>
+              <div class="small text-secondary">{{ booking.service }} · {{ booking.formatted_date or booking.date }}</div>
+            </div>
+            <span class="badge text-bg-warning align-self-start">Pending</span>
+          </div>
+          <div class="d-flex gap-2 mt-3">
+            <form method="post" action="{{ url_for('admin.approve_booking', booking_id=booking.booking_id) }}" class="flex-fill">
+              <button class="btn btn-success w-100" type="submit">Approve</button>
+            </form>
+            <form method="post" action="{{ url_for('admin.reject_booking', booking_id=booking.booking_id) }}" class="flex-fill">
+              <button class="btn btn-outline-danger w-100" type="submit">Reject</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}
