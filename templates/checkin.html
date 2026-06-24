@@ -321,14 +321,13 @@
 
         <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; margin-top:1rem;">
           {% if booking.date == today and booking.status == 'approved' %}
-            <a href="{{ url_for('admin.admin_checkin_booking', booking_id=booking.booking_id) }}"
-               class="btn btn-success btn-sm"
-               data-whatsapp-trigger="true"
-               data-booking-id="{{ booking.booking_id }}"
-               data-action="checked_in"
-               data-loading-text="Checking In...">
+            <form method="POST" action="{{ url_for('admin.admin_checkin_booking', booking_id=booking.booking_id) }}" style="display:inline">
+              <button type="submit"
+                      class="btn btn-success btn-sm"
+                      data-loading-text="Checking In...">
               ✔ Check In Vehicle
-            </a>
+              </button>
+            </form>
             {% if booking.phone %}
               {% set message =
               "Hello " ~ booking.name ~ "%0A%0A" ~
@@ -352,24 +351,27 @@
             {% endif %}
           {% elif booking.status == 'checked_in' %}
             <span class="status-badge status-in_service">Already checked in</span>
-            <a href="{{ url_for('admin.complete_booking', booking_id=booking.booking_id) }}"
-               class="btn btn-sm"
-               style="background:#f59e0b;color:#fff;"
-               data-loading-text="Completing..."
-               onclick="return confirm('Mark this service as complete?')">
+            <form method="POST" action="{{ url_for('admin.complete_booking', booking_id=booking.booking_id) }}" style="display:inline" onsubmit="return confirm('Mark this service as complete?')">
+              <button type="submit"
+                      class="btn btn-sm"
+                      style="background:#f59e0b;color:#fff;"
+                      data-loading-text="Completing...">
               Mark Complete
-            </a>
+              </button>
+            </form>
           {% elif booking.status == 'completed' %}
             <span class="status-badge status-completed">Service Completed</span>
           {% elif booking.status == 'rejected' %}
             <span class="status-badge status-rejected">Booking Rejected</span>
           {% elif booking.status == 'pending' %}
             <span class="status-badge status-pending">Not Approved Yet</span>
-            <a href="{{ url_for('admin.approve_booking', booking_id=booking.booking_id) }}"
-               class="btn btn-success btn-sm"
-               data-loading-text="Approving...">
+            <form method="POST" action="{{ url_for('admin.approve_booking', booking_id=booking.booking_id) }}" style="display:inline">
+              <button type="submit"
+                      class="btn btn-success btn-sm"
+                      data-loading-text="Approving...">
               Approve Now
-            </a>
+              </button>
+            </form>
           {% elif booking.date != today and booking.status == 'approved' %}
             <div class="dash-alert dash-alert-error" style="margin:0;">
               Scheduled for {{ booking.formatted_date or booking.date }} - not today
@@ -409,11 +411,13 @@
               </td>
               <td>{{ b.service }}</td>
               <td>
-                <a href="{{ url_for('admin.admin_checkin_booking', booking_id=b.booking_id) }}"
-                   class="btn btn-primary btn-sm action-btn-compact"
-                   data-loading-text="Checking In...">
+                <form method="POST" action="{{ url_for('admin.admin_checkin_booking', booking_id=b.booking_id) }}" style="display:inline">
+                  <button type="submit"
+                          class="btn btn-primary btn-sm action-btn-compact"
+                          data-loading-text="Checking In...">
                   Check In
-                </a>
+                  </button>
+                </form>
               </td>
             </tr>
             {% endfor %}
@@ -481,15 +485,13 @@
                       Send WhatsApp
                     </a>
                   {% endif %}
-                  <a href="{{ url_for('admin.complete_booking', booking_id=b.booking_id) }}"
-                     class="btn btn-primary btn-sm action-btn-compact"
-                     data-whatsapp-trigger="true"
-                     data-booking-id="{{ b.booking_id }}"
-                     data-action="completed"
-                     data-loading-text="Completing..."
-                     onclick="return confirm('Mark this service as complete?')">
+                  <form method="POST" action="{{ url_for('admin.complete_booking', booking_id=b.booking_id) }}" style="display:inline" onsubmit="return confirm('Mark this service as complete?')">
+                    <button type="submit"
+                            class="btn btn-primary btn-sm action-btn-compact"
+                            data-loading-text="Completing...">
                     Mark Complete
-                  </a>
+                    </button>
+                  </form>
                 </div>
               </td>
             </tr>

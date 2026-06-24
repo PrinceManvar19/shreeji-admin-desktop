@@ -366,7 +366,7 @@ def edit_slot(slot_id):
     return redirect(url_for("admin.admin_slots"))
 
 
-@admin_bp.route("/approve/<booking_id>", methods=["GET", "POST"])
+@admin_bp.route("/approve/<booking_id>", methods=["POST"])
 def approve_booking(booking_id):
     admin_guard = _require_admin()
     if admin_guard is not None:
@@ -383,7 +383,7 @@ def approve_booking(booking_id):
     return _redirect_with_whatsapp(booking_id, get_booking_by_id(booking_id) or booking, fallback)
 
 
-@admin_bp.route("/reject/<booking_id>", methods=["GET", "POST"])
+@admin_bp.route("/reject/<booking_id>", methods=["POST"])
 def reject_booking(booking_id):
     admin_guard = _require_admin()
     if admin_guard is not None:
@@ -400,7 +400,7 @@ def reject_booking(booking_id):
     return _redirect_with_whatsapp(booking_id, get_booking_by_id(booking_id) or booking, fallback)
 
 
-@admin_bp.route("/checkin/<booking_id>", methods=["GET", "POST"])
+@admin_bp.route("/checkin/<booking_id>", methods=["POST"])
 def admin_checkin_booking(booking_id):
     admin_guard = _require_admin()
     if admin_guard is not None:
@@ -455,7 +455,7 @@ def admin_reschedule_checkin(booking_id):
     return _redirect_with_whatsapp(booking_id, get_booking_by_id(booking_id) or booking, fallback)
 
 
-@admin_bp.route("/complete/<booking_id>")
+@admin_bp.route("/complete/<booking_id>", methods=["POST"])
 def complete_booking(booking_id):
     admin_guard = _require_admin()
     if admin_guard is not None:

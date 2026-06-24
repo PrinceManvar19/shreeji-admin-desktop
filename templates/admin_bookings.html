@@ -114,11 +114,13 @@
               </td>
               <td class="action-col">
                 {% if b.status == 'approved' %}
-                  <a href="{{ url_for('admin.admin_checkin_booking', booking_id=b.booking_id) }}"
-                     class="btn btn-primary btn-sm action-btn-compact loading-btn"
-                     data-loading-text="Checking In...">
-                    Check-In
-                  </a>
+                  <form method="POST" action="{{ url_for('admin.admin_checkin_booking', booking_id=b.booking_id) }}" style="display:inline">
+                    <button type="submit"
+                            class="btn btn-primary btn-sm action-btn-compact loading-btn"
+                            data-loading-text="Checking In...">
+                      Check-In
+                    </button>
+                  </form>
                 {% elif b.status == 'checked_in' %}
                   <span class="status-badge status-in_service">In Garage</span>
                 {% else %}
@@ -229,8 +231,12 @@
       const approveUrl = approveUrlTemplate.replace('__BOOKING_ID__', encodeURIComponent(bookingId));
       const rejectUrl = rejectUrlTemplate.replace('__BOOKING_ID__', encodeURIComponent(bookingId));
       actions.innerHTML =
-        '<a href="' + approveUrl + '" class="dash-btn-primary loading-btn" data-loading-text="Approving..." data-toast="Booking Approved">Approve</a>' +
-        '<a href="' + rejectUrl + '" class="dash-btn-secondary booking-modal-danger loading-btn" data-loading-text="Rejecting..." data-toast="Booking Rejected" onclick="return confirm(\'Reject this booking? This cannot be undone.\')">Reject</a>';
+        '<form method="POST" action="' + approveUrl + '" style="display:inline">' +
+          '<button type="submit" class="dash-btn-primary loading-btn" data-loading-text="Approving..." data-toast="Booking Approved">Approve</button>' +
+        '</form>' +
+        '<form method="POST" action="' + rejectUrl + '" style="display:inline" onsubmit="return confirm(\'Reject this booking? This cannot be undone.\')">' +
+          '<button type="submit" class="dash-btn-secondary booking-modal-danger loading-btn" data-loading-text="Rejecting..." data-toast="Booking Rejected">Reject</button>' +
+        '</form>';
     } else if (status === 'approved') {
       message.hidden = false;
       message.textContent = 'Use the Check-In column when the vehicle arrives.';

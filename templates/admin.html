@@ -271,12 +271,11 @@
                     Send WhatsApp
                   </a>
                 {% endif %}
-                <a href="/admin/complete/{{ b.booking_id }}"
-                   class="btn btn-primary btn-sm loading-btn"
-                   data-whatsapp-trigger="true"
-                   data-booking-id="{{ b.booking_id }}"
-                   data-action="completed"
-                   data-loading-text="Completing...">Mark Complete</a>
+                <form method="POST" action="/admin/complete/{{ b.booking_id }}" style="display:inline">
+                  <button type="submit"
+                          class="btn btn-primary btn-sm loading-btn"
+                          data-loading-text="Completing...">Mark Complete</button>
+                </form>
               </td>
             </tr>
             {% endfor %}
@@ -329,14 +328,13 @@
 
         {% if booking.date == today and booking.status == 'approved' %}
           <div style="margin-top:1rem;">
-            <a href="/admin/checkin/{{ booking.booking_id }}"
-               class="dash-btn-primary"
-               data-whatsapp-trigger="true"
-               data-booking-id="{{ booking.booking_id }}"
-               data-action="checked_in"
-               data-loading-text="Checking In...">
-              <i class="fas fa-check-circle"></i> Check-In
-            </a>
+            <form method="POST" action="/admin/checkin/{{ booking.booking_id }}" style="display:inline">
+              <button type="submit"
+                      class="dash-btn-primary"
+                      data-loading-text="Checking In...">
+                <i class="fas fa-check-circle"></i> Check-In
+              </button>
+            </form>
           </div>
           {% if booking.phone %}
             {% set message =
