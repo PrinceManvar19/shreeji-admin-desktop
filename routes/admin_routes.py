@@ -23,6 +23,7 @@ from services.booking_service import (
     get_admin_bookings_local,
     get_booking_by_id,
     get_booking_stats,
+    get_garage_inventory,
     get_today_bookings,
     get_today_bookings_local,
 )
@@ -110,15 +111,23 @@ def admin():
     stats = get_booking_stats(bookings)
     today_bookings = get_today_bookings(today)
     today_stats = get_booking_stats(today_bookings)
+    vehicles_in_garage = [booking for booking in bookings if booking.get("status") == STATUS_CHECKED_IN]
+    late_arrival_bookings = [
+        booking
+        for booking in bookings
+        if booking.get("status") == STATUS_APPROVED and (booking.get("date") or "") < today
+    ]
 
     return render_template(
-        "admin/dashboard.html",
+        "admin.html",
         stats=stats,
         today_stats=today_stats,
-        pending_count=stats.get("pending", 0),
-        approved_count=stats.get("approved", 0),
-        checked_in_count=stats.get("checked_in", 0),
-        completed_today_count=today_stats.get("completed", 0),
+        today_bookings=today_bookings,
+        late_arrival_bookings=late_arrival_bookings,
+        vehicles_in_garage=vehicles_in_garage,
+        service_due_count=due_reminder_count_local(),
+        booking_data=None,
+        checkin_booking_id="",
         today=today,
         today_display=format_date_display(today),
     )
@@ -136,21 +145,26 @@ def admin_checkin_page():
         else request.args.get("q", request.args.get("booking_id", ""))
     ).strip()
     booking_data = None
-    results = []
 
     if search_term:
         booking_data = get_booking_by_id(search_term.upper())
-        if booking_data:
-            results = [booking_data]
-        else:
-            results = get_admin_bookings({"query": search_term})
+
+    today = get_today_date_string()
+    today_queue = [
+        booking
+        for booking in get_today_bookings(today)
+        if booking.get("status") == STATUS_APPROVED
+    ]
+    vehicles_in_garage = get_admin_bookings({"status": STATUS_CHECKED_IN})
 
     return render_template(
-        "admin/checkin.html",
-        search_term=search_term,
+        "checkin.html",
+        checkin_booking_id=search_term,
         booking_data=booking_data,
-        results=results,
-        today=get_today_date_string(),
+        today_queue=today_queue,
+        vehicles_in_garage=vehicles_in_garage,
+        today=today,
+        today_display=format_date_display(today),
     )
 
 
@@ -175,17 +189,7 @@ def admin_slots():
         return admin_guard
 
     slots_map = get_slots_for_admin()
-    slots = []
-    for date in get_next_days(14):
-        slot = slots_map.get(date, {"total": 0, "booked": 0, "available": 0})
-        slots.append({
-            "date": date,
-            "formatted_date": format_date_display(date),
-            "total": slot.get("total", 0),
-            "booked": slot.get("booked", 0),
-            "available": slot.get("available", 0),
-        })
-    return render_template("admin/slots.html", slots=slots, today=get_today_date_string())
+    return render_template("admin_slots.html", slots=slots_map, today=get_today_date_string())
 
 
 @admin_bp.route("/bookings")
@@ -194,11 +198,36 @@ def admin_bookings():
     if admin_guard is not None:
         return admin_guard
 
-    bookings = get_admin_bookings({"status": STATUS_PENDING})
+    filters = {
+        "query": request.args.get("q", "").strip(),
+        "date": request.args.get("date", "").strip(),
+        "status": request.args.get("status", "").strip(),
+    }
+    bookings = get_admin_bookings(filters)
     return render_template(
-        "admin/booking_requests.html",
+        "admin_bookings.html",
         bookings=bookings,
+        filters=filters,
         today=get_today_date_string(),
+    )
+
+
+@admin_bp.route("/garage")
+def admin_garage():
+    admin_guard = _require_admin()
+    if admin_guard is not None:
+        return admin_guard
+
+    today = get_today_date_string()
+    inventory = get_garage_inventory(today)
+    delayed_count = sum(1 for booking in inventory if booking.get("is_delayed"))
+
+    return render_template(
+        "admin/garage.html",
+        inventory=inventory,
+        delayed_count=delayed_count,
+        today=today,
+        today_display=format_date_display(today),
     )
 
 
@@ -281,7 +310,7 @@ def admin_walkin():
             fallback = redirect(url_for("admin.admin_walkin"))
             return _redirect_with_whatsapp(booking["booking_id"], booking, fallback)
 
-    return render_template("admin/walkin.html", today=today)
+    return render_template("admin_walkin.html", today=today, slots=get_slots_for_admin())
 
 
 @admin_bp.route("/export")

@@ -297,32 +297,8 @@
         <a href="{{ url_for('admin.admin_bookings') }}" class="admin-sidebar-link {% if request.path.startswith(url_for('admin.admin_bookings')) %}active{% endif %}">
           <i class="fas fa-clipboard-list"></i> Booking Requests
         </a>
-        <a href="{{ url_for('admin.service_reminders') }}" class="admin-sidebar-link {% if request.path.startswith(url_for('admin.service_reminders')) %}active{% endif %}">
-          <i class="fas fa-bell"></i> Service Reminder
-        </a>
         <a href="{{ url_for('admin.admin_walkin') }}" class="admin-sidebar-link {% if request.path.startswith(url_for('admin.admin_walkin')) %}active{% endif %}">
           <i class="fas fa-motorcycle"></i> Walk-in Entry
-        </a>
-        <a href="{{ url_for('admin.admin_export') }}" class="admin-sidebar-link {% if request.path.startswith(url_for('admin.admin_export')) %}active{% endif %}">
-          <i class="fas fa-file-export"></i> Export Data
-        </a>
-        <a href="{{ url_for('salary.workers') }}" class="admin-sidebar-link {% if request.path.startswith(url_for('salary.workers')) %}active{% endif %}">
-          <i class="fas fa-users"></i> Workers
-        </a>
-        <a href="{{ url_for('salary.salary_history') }}" class="admin-sidebar-link {% if request.path.startswith(url_for('salary.salary_history')) %}active{% endif %}">
-          <i class="fas fa-history"></i> Salary History
-        </a>
-        <a href="{{ url_for('salary.worker_advances') }}" class="admin-sidebar-link {% if request.path.startswith(url_for('salary.worker_advances')) %}active{% endif %}">
-          <i class="fas fa-hand-holding-dollar"></i> Worker Advances
-        </a>
-        <a href="{{ url_for('attendance.attendance_page') }}" class="admin-sidebar-link {% if request.endpoint == 'attendance.attendance_page' %}active{% endif %}">
-          <i class="fas fa-clipboard-check"></i> Attendance
-        </a>
-        <a href="{{ url_for('attendance.attendance_history') }}" class="admin-sidebar-link {% if request.path.startswith(url_for('attendance.attendance_history')) %}active{% endif %}">
-          <i class="fas fa-clock-rotate-left"></i> Attendance History
-        </a>
-        <a href="{{ url_for('admin.admin_reference') }}" class="admin-sidebar-link {% if request.endpoint == 'admin.admin_reference' %}active{% endif %}">
-          <i class="fas fa-book-open"></i> Reference
         </a>
       </nav>
 

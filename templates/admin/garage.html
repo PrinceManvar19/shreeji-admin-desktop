@@ -1,0 +1,100 @@
+{% extends "admin_base.html" %}
+{% block title %}Garage Inventory - Shreeji Auto Services{% endblock %}
+
+{% block content %}
+<div class="dashboard-wrap">
+  <div class="dash-header">
+    <div>
+      <h1 class="dash-title">
+        <i class="fas fa-warehouse"></i> Garage Inventory
+      </h1>
+      <p class="dash-sub">Vehicles currently checked in and waiting for completion.</p>
+    </div>
+  </div>
+
+  <div class="admin-stats today-control-panel">
+    <div class="admin-stat-card today-card today-checked-in">
+      <i class="fas fa-motorcycle"></i>
+      <div class="admin-stat-num">{{ inventory|length }}</div>
+      <div class="admin-stat-label">Vehicles Inside</div>
+    </div>
+    <div class="admin-stat-card today-card today-pending">
+      <i class="fas fa-clock"></i>
+      <div class="admin-stat-num">{{ delayed_count }}</div>
+      <div class="admin-stat-label">Delayed</div>
+    </div>
+    <div class="admin-stat-card today-card">
+      <i class="fas fa-calendar-day"></i>
+      <div class="admin-stat-num" style="font-size:1.35rem;">{{ today_display }}</div>
+      <div class="admin-stat-label">Today</div>
+    </div>
+  </div>
+
+  <div class="dash-card">
+    <div class="section-header">
+      <h2 class="dash-card-title" style="margin-bottom:0;">
+        <i class="fas fa-screwdriver-wrench"></i> Current Vehicle Service
+      </h2>
+      <a href="{{ url_for('admin.admin_walkin') }}" class="dash-btn-primary" style="margin-top:0;">
+        <i class="fas fa-plus"></i> Add Walk-in
+      </a>
+    </div>
+
+    <div class="table-responsive dash-table-wrap">
+      <table class="dash-table">
+        <thead>
+          <tr>
+            <th>Booking ID</th>
+            <th>Customer</th>
+            <th>Phone</th>
+            <th>Vehicle</th>
+            <th>Service</th>
+            <th>Checked In</th>
+            <th>Status</th>
+            <th class="action-col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if inventory %}
+            {% for b in inventory %}
+            <tr>
+              <td><strong>{{ b.booking_id }}</strong></td>
+              <td>{{ b.name }}</td>
+              <td>{{ b.phone or '-' }}</td>
+              <td>
+                <div>{{ b.vehicle }}</div>
+                {% if b.brand_model %}<small>{{ b.brand_model }}</small>{% endif %}
+              </td>
+              <td>{{ b.service }}</td>
+              <td>
+                <div>{{ b.formatted_garage_day }}</div>
+                <small>{{ b.days_in_garage }} day{% if b.days_in_garage != 1 %}s{% endif %} in garage</small>
+              </td>
+              <td>
+                {% if b.is_delayed %}
+                  <span class="status-badge status-pending">Delayed</span>
+                {% else %}
+                  <span class="status-badge status-in_service">In Garage</span>
+                {% endif %}
+              </td>
+              <td class="action-col">
+                <form method="POST" action="{{ url_for('admin.complete_booking', booking_id=b.booking_id) }}" style="display:inline" onsubmit="return confirm('Mark this vehicle service as completed?')">
+                  <input type="hidden" name="next" value="{{ url_for('admin.admin_garage') }}">
+                  <button type="submit" class="btn btn-primary btn-sm action-btn-compact" data-loading-submit data-loading-text="Completing...">
+                    Mark Complete
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="8" class="dash-empty">No vehicles are currently in the garage.</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -368,6 +368,35 @@ def get_admin_bookings(filters=None):
     ]
 
 
+def get_garage_inventory(today_date=None):
+    today = parse_datetime(today_date or datetime.now().strftime("%Y-%m-%d"))
+    today_day = today.date() if today else datetime.now().date()
+    bookings = get_admin_bookings({"status": STATUS_CHECKED_IN})
+
+    inventory = []
+    for booking in bookings:
+        garage_started_at = (
+            parse_datetime(booking.get("actual_visit_date"))
+            or parse_datetime(booking.get("checked_in_at"))
+            or parse_datetime(booking.get("date"))
+        )
+        garage_day = garage_started_at.date() if garage_started_at else today_day
+        days_in_garage = max((today_day - garage_day).days + 1, 1)
+
+        enriched = dict(booking)
+        enriched["garage_day"] = garage_day.strftime("%Y-%m-%d")
+        enriched["formatted_garage_day"] = format_date_display(enriched["garage_day"])
+        enriched["days_in_garage"] = days_in_garage
+        enriched["is_delayed"] = garage_day < today_day
+        inventory.append(enriched)
+
+    return sorted(
+        inventory,
+        key=lambda item: (item.get("is_delayed", False), item.get("garage_day", "")),
+        reverse=True,
+    )
+
+
 def get_admin_bookings_local(filters=None):
     from models.booking_model import search_bookings_local
 

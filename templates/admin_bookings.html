@@ -1,167 +1,386 @@
 {% extends "admin_base.html" %}
 {% block title %}Booking Requests - Shreeji Auto Services{% endblock %}
 
+{% block extra_head %}
+<style>
+  .booking-filter-card {
+    margin-bottom: 1.25rem;
+    padding: 1.55rem 1.6rem;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: var(--shadow-card);
+  }
+
+  .booking-filter-grid {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(260px, 1.35fr) auto auto;
+    gap: 1.1rem 1.25rem;
+    align-items: end;
+  }
+
+  .booking-filter-field label {
+    display: block;
+    margin-bottom: 0.6rem;
+    color: #111;
+    font-size: 0.78rem;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .booking-filter-field input,
+  .booking-filter-field select {
+    width: 100%;
+    min-height: 58px;
+    padding: 0.82rem 1rem;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 14px;
+    background: #fff;
+    color: #111827;
+    font: 600 1rem var(--font-body);
+    outline: none;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .booking-filter-field input:focus,
+  .booking-filter-field select:focus {
+    border-color: rgba(162, 4, 5, 0.55);
+    box-shadow: 0 0 0 3px rgba(162, 4, 5, 0.09);
+  }
+
+  .booking-filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .booking-apply-btn {
+    min-height: 58px;
+    min-width: 128px;
+    justify-content: center;
+    border-radius: 14px;
+    background: #a20405;
+    box-shadow: 0 16px 34px rgba(162, 4, 5, 0.18);
+  }
+
+  .booking-reset-link {
+    min-height: 58px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.7rem;
+    color: #6b7280;
+    font-weight: 900;
+  }
+
+  .booking-requests-card {
+    padding: 1.55rem 1.6rem 1.65rem;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: var(--shadow-card);
+  }
+
+  .booking-requests-title {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin: 0 0 1.45rem;
+    color: #111827;
+    font-family: var(--font-head);
+    font-size: 1.25rem;
+    font-weight: 800;
+  }
+
+  .booking-requests-title i {
+    color: #b00000;
+  }
+
+  .booking-card-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+
+  .booking-row {
+    position: relative;
+    min-height: 248px;
+    padding: 1.45rem 1.3rem 1.25rem;
+    border: 1px solid #dbe1ea;
+    border-radius: 8px;
+    background: #fff;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  }
+
+  .booking-row:hover,
+  .booking-row.booking-request-row-active {
+    border-color: rgba(162, 4, 5, 0.32);
+    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+    transform: translateY(-1px);
+  }
+
+  .booking-card-top {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .booking-card-id {
+    margin: 0 0 0.45rem;
+    color: #030712;
+    font-size: 1.05rem;
+    font-weight: 900;
+    letter-spacing: 0.01em;
+  }
+
+  .booking-card-customer {
+    margin: 0;
+    color: #030712;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.45;
+  }
+
+  .booking-card-meta,
+  .booking-card-date {
+    margin: 0.25rem 0 0;
+    color: #8b929e;
+    font-size: 0.94rem;
+    font-weight: 600;
+  }
+
+  .booking-status-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 0.4rem 0.82rem;
+    border-radius: 999px;
+    white-space: nowrap;
+    font-size: 0.8rem;
+    font-weight: 900;
+    text-transform: capitalize;
+  }
+
+  .booking-status-pending { background: #fff4d8; color: #a15c00; }
+  .booking-status-approved { background: #c9f7de; color: #047857; }
+  .booking-status-checked_in { background: #eee7ff; color: #6d28d9; }
+  .booking-status-completed { background: #e5e7eb; color: #4b5563; }
+  .booking-status-rejected { background: #fee2e2; color: #b91c1c; }
+
+  .booking-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+    margin-top: 1.55rem;
+  }
+
+  .booking-card-actions form {
+    margin: 0;
+  }
+
+  .booking-action-primary,
+  .booking-action-warning,
+  .booking-action-muted,
+  .booking-action-success {
+    min-width: 128px;
+    min-height: 58px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 14px;
+    padding: 0.75rem 1.25rem;
+    font-size: 1rem;
+    font-weight: 900;
+    text-decoration: none;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  }
+
+  .booking-action-primary {
+    background: #b00000;
+    color: #fff;
+    box-shadow: 0 16px 28px rgba(176, 0, 0, 0.15);
+  }
+
+  .booking-action-warning {
+    background: #ffc107;
+    color: #050505;
+  }
+
+  .booking-action-success {
+    background: #16a34a;
+    color: #fff;
+  }
+
+  .booking-action-muted {
+    background: #f4f5f7;
+    color: #374151;
+  }
+
+  .booking-action-primary:hover,
+  .booking-action-warning:hover,
+  .booking-action-muted:hover,
+  .booking-action-success:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+  }
+
+  .booking-empty {
+    min-height: 220px;
+    display: grid;
+    place-items: center;
+    border: 1px dashed #d1d5db;
+    border-radius: 10px;
+    color: #6b7280;
+    font-weight: 800;
+    text-align: center;
+  }
+
+  @media (max-width: 1180px) {
+    .booking-filter-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .booking-filter-actions {
+      grid-column: span 2;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .booking-card-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .booking-filter-card,
+    .booking-requests-card {
+      padding: 1.1rem;
+    }
+    .booking-filter-grid {
+      grid-template-columns: 1fr;
+    }
+    .booking-filter-actions {
+      grid-column: auto;
+      align-items: stretch;
+      flex-direction: column;
+    }
+    .booking-apply-btn,
+    .booking-reset-link,
+    .booking-action-primary,
+    .booking-action-warning,
+    .booking-action-muted,
+    .booking-action-success {
+      width: 100%;
+    }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="dashboard-wrap">
-  <div class="dash-header">
-    <div>
-      <h1 class="dash-title">
-        <i class="fas fa-list-alt"></i> Booking Requests
-      </h1>
-      <p class="dash-sub">Review requests, approve bookings, and manage customer messages.</p>
+  <form method="GET" action="{{ url_for('admin.admin_bookings') }}" class="booking-filter-card">
+    <div class="booking-filter-grid">
+      <div class="booking-filter-field">
+        <label for="bookingFilterDate">Date</label>
+        <input type="date" id="bookingFilterDate" name="date" value="{{ filters.date if filters else '' }}" />
+      </div>
+      <div class="booking-filter-field">
+        <label for="bookingFilterStatus">Status</label>
+        <select id="bookingFilterStatus" name="status">
+          <option value="">All</option>
+          <option value="pending" {% if filters and filters.status == 'pending' %}selected{% endif %}>Pending</option>
+          <option value="approved" {% if filters and filters.status == 'approved' %}selected{% endif %}>Approved</option>
+          <option value="checked_in" {% if filters and filters.status == 'checked_in' %}selected{% endif %}>Checked In</option>
+          <option value="completed" {% if filters and filters.status == 'completed' %}selected{% endif %}>Completed</option>
+          <option value="rejected" {% if filters and filters.status == 'rejected' %}selected{% endif %}>Rejected</option>
+        </select>
+      </div>
+      <div class="booking-filter-field">
+        <label for="bookingFilterSearch">Search</label>
+        <input type="search" id="bookingFilterSearch" name="q" value="{{ filters.query if filters else '' }}" placeholder="Name, phone, vehicle, booking ID" />
+      </div>
+      <div class="booking-filter-actions">
+        <button type="submit" class="dash-btn-primary booking-apply-btn">Apply</button>
+      </div>
+      <a href="{{ url_for('admin.admin_bookings') }}" class="booking-reset-link">Reset</a>
     </div>
-  </div>
+  </form>
 
-  <div class="dash-card">
-    <div class="section-header">
-      <h2 class="dash-card-title" style="margin-bottom:0;">
-        <i class="fas fa-list-alt"></i> Booking Requests
-      </h2>
-    </div>
+  <section class="booking-requests-card">
+    <h1 class="booking-requests-title">
+      <i class="fas fa-clipboard-list"></i> Requests
+    </h1>
 
-    <div class="admin-quick-filters">
-      <button type="button" class="admin-quick-filter quick-filter-chip active" data-filter="all" onclick="setFilter('all')">All</button>
-      <button type="button" class="admin-quick-filter quick-filter-chip" data-filter="today" onclick="setFilter('today')">Today</button>
-      <button type="button" class="admin-quick-filter quick-filter-chip" data-filter="pending" onclick="setFilter('pending')">Pending</button>
-      <button type="button" class="admin-quick-filter quick-filter-chip" data-filter="approved" onclick="setFilter('approved')">Approved</button>
-      <button type="button" class="admin-quick-filter quick-filter-chip" data-filter="checked_in" onclick="setFilter('checked_in')">In Garage</button>
-    </div>
+    {% if bookings %}
+      <div class="booking-card-grid">
+        {% for b in bookings %}
+          {% set status_label = 'Pending' if b.status == 'pending' else 'Approved' if b.status == 'approved' else 'Checked In' if b.status == 'checked_in' else 'Rejected' if b.status == 'rejected' else 'Completed' if b.status == 'completed' else b.status %}
+          <article class="booking-row"
+                   data-booking-id="{{ b.booking_id }}"
+                   data-name="{{ b.name }}"
+                   data-phone="{{ b.phone or '-' }}"
+                   data-vehicle="{{ b.vehicle }}"
+                   data-service="{{ b.service }}"
+                   data-date="{{ b.slot_label or b.formatted_date or b.date }}"
+                   data-raw-date="{{ b.date }}"
+                   data-is-today="{% if b.date == today %}true{% else %}false{% endif %}"
+                   data-status="{{ b.status }}"
+                   data-status-label="{{ status_label }}">
+            <div class="booking-card-top">
+              <div>
+                <h2 class="booking-card-id">{{ b.booking_id }}</h2>
+                <p class="booking-card-customer">{{ b.name }} | {{ b.phone or '-' }}</p>
+                <p class="booking-card-meta">{{ b.vehicle }}{% if b.brand_model %} | {{ b.brand_model }}{% endif %} | {{ b.service }}</p>
+                <p class="booking-card-date">{{ b.slot_label or b.formatted_date or b.date }}</p>
+              </div>
+              <span class="booking-status-pill booking-status-{{ b.status }}">{{ status_label }}</span>
+            </div>
 
-    <form method="GET" action="{{ url_for('admin.admin_bookings') }}" class="dash-form" style="margin-bottom:1.25rem;">
-      <div style="display:flex; gap:1rem; align-items:flex-end; flex-wrap:wrap;">
-        <div style="flex:1; min-width:180px;">
-          <label>Filter by Date</label>
-          <input type="date" name="date" value="{{ filters.date if filters else '' }}" />
-        </div>
-        <div style="flex:1; min-width:180px;">
-          <label>Filter by Status</label>
-          <select name="status">
-            <option value="">All Statuses</option>
-            <option value="pending" {% if filters and filters.status == 'pending' %}selected{% endif %}>Pending</option>
-            <option value="approved" {% if filters and filters.status == 'approved' %}selected{% endif %}>Approved</option>
-            <option value="checked_in" {% if filters and filters.status == 'checked_in' %}selected{% endif %}>In Garage</option>
-            <option value="completed" {% if filters and filters.status == 'completed' %}selected{% endif %}>Completed</option>
-            <option value="rejected" {% if filters and filters.status == 'rejected' %}selected{% endif %}>Rejected</option>
-          </select>
-        </div>
-        <div style="display:flex; gap:0.5rem; align-items:flex-end;">
-          <button type="submit" id="apply-btn" class="dash-btn-primary">
-            <i class="fas fa-search"></i> Apply
-          </button>
-          <a href="{{ url_for('admin.admin_bookings') }}" class="dash-btn-secondary">
-            <i class="fas fa-rotate-left"></i> Reset
-          </a>
+            <div class="booking-card-actions">
+              {% if b.status == 'pending' %}
+                <form method="POST" action="{{ url_for('admin.approve_booking', booking_id=b.booking_id) }}">
+                  <button type="submit" class="booking-action-success loading-btn" data-loading-text="Approving...">Approve</button>
+                </form>
+                <form method="POST" action="{{ url_for('admin.reject_booking', booking_id=b.booking_id) }}" onsubmit="return confirm('Reject this booking? This cannot be undone.')">
+                  <button type="submit" class="booking-action-muted loading-btn" data-loading-text="Rejecting...">Reject</button>
+                </form>
+              {% elif b.status == 'approved' %}
+                <form method="POST" action="{{ url_for('admin.admin_checkin_booking', booking_id=b.booking_id) }}">
+                  <button type="submit" class="booking-action-primary loading-btn" data-loading-text="Checking In...">Check-In</button>
+                </form>
+              {% elif b.status == 'checked_in' %}
+                <form method="POST" action="{{ url_for('admin.complete_booking', booking_id=b.booking_id) }}">
+                  <button type="submit" class="booking-action-warning loading-btn" data-loading-text="Completing...">Complete</button>
+                </form>
+              {% endif %}
+
+              {% if b.phone %}
+                <a href="#"
+                   class="booking-action-muted"
+                   data-whatsapp-route="{{ url_for('admin.send_booking_whatsapp', booking_id=b.booking_id) }}"
+                   data-loading-text="Sending..."
+                   data-toast-message="Message sent">
+                  {% if b.whatsapp_sent %}Re-send{% else %}Send{% endif %}
+                </a>
+              {% endif %}
+
+              <button type="button" class="booking-action-muted" onclick="openBookingModal(this.closest('.booking-row'))">Manage</button>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="booking-empty">
+        <div>
+          <i class="fas fa-calendar-xmark" style="display:block;font-size:2.2rem;margin-bottom:0.7rem;color:#9ca3af;"></i>
+          No booking requests found.
         </div>
       </div>
-    </form>
-
-    <div class="table-responsive dash-table-wrap">
-      <table class="dash-table">
-        <thead>
-          <tr>
-            <th>Booking ID</th>
-            <th>Customer</th>
-            <th>Phone</th>
-            <th>Vehicle</th>
-            <th>Service</th>
-            <th>Slot / Time</th>
-            <th>Status</th>
-            <th class="action-col">Check-In</th>
-            <th class="action-col">WhatsApp</th>
-            <th class="action-col">Manage</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% if bookings %}
-            {% for b in bookings %}
-            <tr class="booking-row"
-                data-booking-id="{{ b.booking_id }}"
-                data-name="{{ b.name }}"
-                data-phone="{{ b.phone or '-' }}"
-                data-vehicle="{{ b.vehicle }}"
-                data-service="{{ b.service }}"
-                data-date="{{ b.slot_label or b.formatted_date or b.date }}"
-                data-raw-date="{{ b.date }}"
-                data-is-today="{% if b.date == today %}true{% else %}false{% endif %}"
-                data-status="{{ b.status }}"
-                data-status-label="{% if b.status == 'pending' %}Pending{% elif b.status == 'approved' %}Approved{% elif b.status == 'checked_in' %}In Garage{% elif b.status == 'rejected' %}Rejected{% elif b.status == 'completed' %}Completed{% else %}{{ b.status }}{% endif %}">
-              <td><strong>{{ b.booking_id }}</strong></td>
-              <td>
-                <div>{{ b.name }}</div>
-                {% if b.customer_id %}<small>{{ b.customer_id }}</small>{% endif %}
-              </td>
-              <td>{{ b.phone or '-' }}</td>
-              <td>
-                <div>{{ b.vehicle }}</div>
-                {% if b.brand_model %}<small>{{ b.brand_model }}</small>{% endif %}
-              </td>
-              <td>{{ b.service }}</td>
-              <td>{{ b.slot_label or b.formatted_date or b.date }}</td>
-              <td>
-                {% if b.status == 'pending' %}
-                  <span class="status-badge status-pending">Pending</span>
-                {% elif b.status == 'approved' %}
-                  <span class="status-badge status-approved">Approved</span>
-                {% elif b.status == 'checked_in' %}
-                  <span class="status-badge status-in_service">In Garage</span>
-                {% elif b.status == 'rejected' %}
-                  <span class="status-badge status-rejected">Rejected</span>
-                {% elif b.status == 'completed' %}
-                  <span class="status-badge status-completed">Completed</span>
-                {% else %}
-                  <span class="status-badge">{{ b.status }}</span>
-                {% endif %}
-              </td>
-              <td class="action-col">
-                {% if b.status == 'approved' %}
-                  <form method="POST" action="{{ url_for('admin.admin_checkin_booking', booking_id=b.booking_id) }}" style="display:inline">
-                    <button type="submit"
-                            class="btn btn-primary btn-sm action-btn-compact loading-btn"
-                            data-loading-text="Checking In...">
-                      Check-In
-                    </button>
-                  </form>
-                {% elif b.status == 'checked_in' %}
-                  <span class="status-badge status-in_service">In Garage</span>
-                {% else %}
-                  <span class="dash-sub">-</span>
-                {% endif %}
-              </td>
-              <td class="action-col">
-                <div class="whatsapp-cell">
-                  {% if b.phone %}
-                    <a href="#"
-                       class="btn btn-sm action-btn-compact {% if b.whatsapp_sent %}btn-outline-primary{% else %}btn-success{% endif %}"
-                       data-whatsapp-route="{{ url_for('admin.send_booking_whatsapp', booking_id=b.booking_id) }}"
-                       data-loading-text="Sending..."
-                       data-toast-message="Message sent"
-                       title="Send or resend WhatsApp message"
-                       aria-label="Send or resend WhatsApp message">
-                      {% if b.whatsapp_sent %}Re-send{% else %}Send{% endif %}
-                    </a>
-                  {% else %}
-                    <span class="dash-sub">-</span>
-                  {% endif %}
-                </div>
-              </td>
-              <td class="action-col">
-                <button type="button"
-                        class="btn btn-secondary btn-sm action-btn-compact"
-                        onclick="openBookingModal(this.closest('tr'))">
-                  Manage
-                </button>
-              </td>
-            </tr>
-            {% endfor %}
-          {% else %}
-            <tr>
-              <td colspan="10" class="dash-empty">No bookings found.</td>
-            </tr>
-          {% endif %}
-        </tbody>
-      </table>
-    </div>
-  </div>
+    {% endif %}
+  </section>
 </div>
 
 <div class="booking-modal-backdrop" id="bookingModalBackdrop" hidden>
@@ -196,7 +415,6 @@
 {% block extra_scripts %}
 <script>
   let activeBookingRow = null;
-  let currentFilter = 'all';
   const approveUrlTemplate = "{{ url_for('admin.approve_booking', booking_id='__BOOKING_ID__') }}";
   const rejectUrlTemplate = "{{ url_for('admin.reject_booking', booking_id='__BOOKING_ID__') }}";
 
@@ -232,23 +450,23 @@
       const rejectUrl = rejectUrlTemplate.replace('__BOOKING_ID__', encodeURIComponent(bookingId));
       actions.innerHTML =
         '<form method="POST" action="' + approveUrl + '" style="display:inline">' +
-          '<button type="submit" class="dash-btn-primary loading-btn" data-loading-text="Approving..." data-toast="Booking Approved">Approve</button>' +
+          '<button type="submit" class="dash-btn-primary loading-btn" data-loading-text="Approving...">Approve</button>' +
         '</form>' +
-        '<form method="POST" action="' + rejectUrl + '" style="display:inline" onsubmit="return confirm(\'Reject this booking? This cannot be undone.\')">' +
-          '<button type="submit" class="dash-btn-secondary booking-modal-danger loading-btn" data-loading-text="Rejecting..." data-toast="Booking Rejected">Reject</button>' +
+        '<form method="POST" action="' + rejectUrl + '" style="display:inline" onsubmit="return confirm(\\'Reject this booking? This cannot be undone.\\')">' +
+          '<button type="submit" class="dash-btn-secondary booking-modal-danger loading-btn" data-loading-text="Rejecting...">Reject</button>' +
         '</form>';
     } else if (status === 'approved') {
       message.hidden = false;
-      message.textContent = 'Use the Check-In column when the vehicle arrives.';
+      message.textContent = 'Use Check-In when the vehicle arrives.';
     } else if (status === 'checked_in') {
       message.hidden = false;
-      message.textContent = 'Vehicle in garage';
+      message.textContent = 'Vehicle is in garage.';
     } else if (status === 'completed') {
       message.hidden = false;
-      message.textContent = 'Service Completed';
+      message.textContent = 'Service completed.';
     } else if (status === 'rejected') {
       message.hidden = false;
-      message.textContent = 'Booking was rejected';
+      message.textContent = 'Booking was rejected.';
     }
 
     backdrop.hidden = false;
@@ -263,43 +481,6 @@
       activeBookingRow.classList.remove('booking-request-row-active');
       activeBookingRow = null;
     }
-  }
-
-  function applyFilter() {
-    const rows = document.querySelectorAll('.booking-row');
-
-    rows.forEach(function(row) {
-      const status = row.dataset.status;
-      const isToday = row.dataset.isToday === 'true';
-      let visible = true;
-
-      if (currentFilter === 'today') {
-        visible = isToday;
-      } else if (currentFilter === 'pending') {
-        visible = status === 'pending';
-      } else if (currentFilter === 'approved') {
-        visible = status === 'approved';
-      } else if (currentFilter === 'checked_in') {
-        visible = status === 'checked_in';
-      }
-
-      row.style.display = visible ? '' : 'none';
-    });
-  }
-
-  function setFilter(filter) {
-    currentFilter = filter;
-
-    document.querySelectorAll('.admin-quick-filter').forEach(function(button) {
-      button.classList.remove('active');
-    });
-
-    const activeButton = document.querySelector('[data-filter="' + filter + '"]');
-    if (activeButton) {
-      activeButton.classList.add('active');
-    }
-
-    applyFilter();
   }
 
   (function() {
@@ -332,8 +513,6 @@
         closeBookingModal();
       }
     });
-
-    setFilter('all');
   })();
 </script>
 {% endblock %}
