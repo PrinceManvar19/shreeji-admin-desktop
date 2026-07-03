@@ -14,10 +14,24 @@
     </h2>
 
     <p class="auth-subtitle">
+      {% if desktop_auth %}
+      Enter the registered admin email to receive a one-time login code.
+      {% else %}
       Already visited us before? Your phone number is already registered - just enter it below.<br>
       Admin/Staff: enter your Admin ID (e.g. ADMIN001) or registered phone number.
+      {% endif %}
     </p>
 
+    {% if desktop_auth %}
+      <form method="POST" action="{{ url_for('auth.desktop_login') }}" class="auth-form" id="loginForm">
+        <label class="form-label" for="loginEmail">Admin Email *</label>
+        <input type="email" class="form-control auth-input" id="loginEmail" name="email" placeholder="admin@example.com" required data-trim>
+
+        <button type="submit" class="btn btn-primary w-100 auth-btn" data-loading-submit="true" data-loading-text="Sending OTP...">
+          Send OTP
+        </button>
+      </form>
+    {% else %}
     {# Admin email OTP login is temporarily disabled. #}
       <form method="POST" action="/login" class="auth-form" id="loginForm">
         <input type="hidden" name="form_action" value="login">
@@ -29,10 +43,13 @@
           Continue to Dashboard
         </button>
       </form>
+    {% endif %}
 
 
 
+    {% if not desktop_auth %}
     <p style="text-align:center;margin-top:1rem;font-size:0.9em;color:#666;">New customer? <a href="/register" style="color:#007bff;font-weight:500;">Create your account -&gt;</a></p>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
@@ -44,7 +61,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const identifierInput = document.getElementById('loginIdentifier');
   const identifierError = document.getElementById('loginIdentifierError');
 
-  if (!loginForm) { return; }
+  if (!loginForm || !identifierInput || !identifierError) { return; }
 
   loginForm.addEventListener('submit', function(event) {
     identifierError.style.display = 'none';

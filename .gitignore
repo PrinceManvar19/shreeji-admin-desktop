@@ -22,4 +22,3 @@ desktop.ini
 # ShreejiAdmin.spec <- DO NOT ignore this, it should stay in repo
 
 data/
-db_local.py

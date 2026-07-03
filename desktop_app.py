@@ -212,7 +212,10 @@ class DesktopApp:
 
     @property
     def dashboard_url(self):
-        return f"http://{HOST}:{self.port}{START_PATH}"
+        from utils.auth_token import is_authenticated
+
+        start_path = START_PATH if is_authenticated() else "/desktop/login"
+        return f"http://{HOST}:{self.port}{start_path}"
 
     def create_window(self):
         self.window = webview.create_window(

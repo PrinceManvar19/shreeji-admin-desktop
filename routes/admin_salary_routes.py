@@ -17,6 +17,7 @@ from models.advance_model import (
     get_recovery_history,
     get_worker_debts,
 )
+from services.auth_service import ensure_desktop_admin_session
 
 
 
@@ -25,9 +26,9 @@ salary_bp = Blueprint("salary", __name__, url_prefix="/admin/salary")
 
 def _require_admin():
     """Admin access guard."""
-    if session.get("role") != "admin":
+    if session.get("role") != "admin" and not ensure_desktop_admin_session():
         flash("Admin access required", "error")
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("auth.desktop_login"))
     return None
 
 

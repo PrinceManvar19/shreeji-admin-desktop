@@ -1,2 +1,1 @@
-# This repo is not deployed. No Procfile needed.
-# To build the .exe run: pyinstaller ShreejiAdmin.spec --noconfirm
+web: gunicorn app:app --bind 0.0.0.0:$PORT

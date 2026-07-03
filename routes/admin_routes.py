@@ -5,8 +5,12 @@ from io import BytesIO, StringIO
 from urllib.parse import quote
 
 from flask import Blueprint, current_app, jsonify, Response, flash, redirect, render_template, request, session, url_for
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill
+from openpyxl.utils import get_column_letter
 
 from db_neon import get_neon_db as get_db, query_dict, query_dict_one
+from db_local import get_local_db
 from models.booking_model import count_bookings_for_slot, get_booking_by_id_local, update_message_flags
 from models.slot_model import update_slot
 from services.booking_service import (
@@ -36,6 +40,7 @@ from services.service_reminder_service import (
     mark_reminder_sent,
     snooze_reminder,
 )
+from services.auth_service import ensure_desktop_admin_session
 from services.slot_service import get_slots_for_admin, get_slots_for_admin_local, set_slot_total
 from utils.constants import STATUS_APPROVED, STATUS_CHECKED_IN, STATUS_COMPLETED, STATUS_PENDING, STATUS_REJECTED
 from models.customer_model import (
@@ -83,9 +88,9 @@ def _refresh_cache_if_stale():
 
 
 def _require_admin():
-    if session.get("role") != "admin":
+    if session.get("role") != "admin" and not ensure_desktop_admin_session():
         flash("Admin access required", "error")
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("auth.desktop_login"))
     return None
 
 
@@ -762,15 +767,19 @@ def export_download():
     if admin_guard is not None:
         return admin_guard
 
-    response = _build_export_response(
-        request.args.get("data_type", "").strip(),
-        request.args.get("from_date", "").strip(),
-        request.args.get("to_date", "").strip(),
-        request.args.get("status", "").strip(),
-    )
-    if response is None:
-        return "Invalid data_type", 400
-    return response
+    try:
+        response = _build_export_response(
+            request.args.get("data_type", "").strip(),
+            request.args.get("from_date", "").strip(),
+            request.args.get("to_date", "").strip(),
+            request.args.get("status", "").strip(),
+        )
+        if response is None:
+            return "Invalid data_type", 400
+        return response
+    except Exception as error:
+        flash(f"Export failed: {error}", "error")
+        return redirect(url_for("admin.admin_export"))
 
 
 @admin_bp.route("/export-data")
@@ -779,12 +788,111 @@ def export_data():
     if admin_guard is not None:
         return admin_guard
 
-    return _build_export_response(
-        request.args.get("data_type", "all").strip() or "all",
-        request.args.get("from_date", "").strip(),
-        request.args.get("to_date", "").strip(),
-        request.args.get("status", "").strip(),
-    )
+    try:
+        return _build_export_response(
+            request.args.get("data_type", "all").strip() or "all",
+            request.args.get("from_date", "").strip(),
+            request.args.get("to_date", "").strip(),
+            request.args.get("status", "").strip(),
+        )
+    except Exception as error:
+        flash(f"Export failed: {error}", "error")
+        return redirect(url_for("admin.admin_export"))
+
+
+@admin_bp.route("/export/workers")
+def export_workers():
+    admin_guard = _require_admin()
+    if admin_guard is not None:
+        return admin_guard
+
+    try:
+        rows = _fetch_worker_export_rows()
+        workbook = _build_excel_workbook("Workers", WORKER_EXPORT_HEADERS, _worker_excel_rows(rows))
+        return _excel_response(workbook, f"workers_export_{_excel_date_stamp()}.xlsx")
+    except Exception as error:
+        flash(f"Workers export failed: {error}", "error")
+        return redirect(url_for("admin.admin_export"))
+
+
+@admin_bp.route("/export/salary")
+def export_salary():
+    admin_guard = _require_admin()
+    if admin_guard is not None:
+        return admin_guard
+
+    try:
+        rows = _fetch_salary_export_rows()
+        workbook = _build_excel_workbook("Salary History", SALARY_EXPORT_HEADERS, _salary_excel_rows(rows))
+        return _excel_response(workbook, f"salary_history_{_excel_date_stamp()}.xlsx")
+    except Exception as error:
+        flash(f"Salary export failed: {error}", "error")
+        return redirect(url_for("admin.admin_export"))
+
+
+@admin_bp.route("/export/attendance")
+def export_attendance_excel():
+    admin_guard = _require_admin()
+    if admin_guard is not None:
+        return admin_guard
+
+    month = request.args.get("month", "").strip()
+    year = request.args.get("year", "").strip()
+    try:
+        current = datetime.now()
+        export_month = int(month or current.month)
+        export_year = int(year or current.year)
+        rows = _fetch_attendance_export_rows(export_month, export_year)
+        workbook = _build_excel_workbook("Attendance", ATTENDANCE_EXPORT_HEADERS, _attendance_excel_rows(rows))
+        return _excel_response(workbook, f"attendance_{export_month:02d}{export_year}.xlsx")
+    except Exception as error:
+        flash(f"Attendance export failed: {error}", "error")
+        return redirect(url_for("admin.admin_export"))
+
+
+@admin_bp.route("/export/backup")
+def export_full_backup():
+    admin_guard = _require_admin()
+    if admin_guard is not None:
+        return admin_guard
+
+    try:
+        workbook = Workbook()
+        workbook.remove(workbook.active)
+        _add_excel_sheet(
+            workbook,
+            "Customers",
+            CUSTOMER_EXPORT_HEADERS,
+            _customer_csv_rows(_fetch_customer_export_rows()),
+        )
+        _add_excel_sheet(
+            workbook,
+            "Bookings",
+            BOOKING_EXPORT_HEADERS,
+            _booking_csv_rows(_fetch_booking_export_rows()),
+        )
+        _add_excel_sheet(
+            workbook,
+            "Workers",
+            WORKER_EXPORT_HEADERS,
+            _worker_excel_rows(_fetch_worker_export_rows()),
+        )
+        _add_excel_sheet(
+            workbook,
+            "Salary History",
+            SALARY_EXPORT_HEADERS,
+            _salary_excel_rows(_fetch_salary_export_rows()),
+        )
+        _add_excel_sheet(
+            workbook,
+            "Attendance",
+            ATTENDANCE_EXPORT_HEADERS,
+            _attendance_excel_rows(_fetch_attendance_export_rows()),
+        )
+        return _excel_response(workbook, f"shreeji_full_backup_{_excel_date_stamp()}.xlsx")
+    except Exception as error:
+        flash(f"Full backup export failed: {error}", "error")
+        return redirect(url_for("admin.admin_export"))
 
 
 def _get_whatsapp_url(booking_id, booking):
@@ -860,6 +968,20 @@ BOOKING_EXPORT_HEADERS = [
 
 CUSTOMER_EXPORT_HEADERS = ["id", "name", "phone", "vehicle"]
 GARAGE_EXPORT_HEADERS = ["booking_id", "name", "phone", "vehicle", "brand_model", "service", "date", "checked_in_at"]
+WORKER_EXPORT_HEADERS = ["Worker ID", "Name", "Phone", "Monthly Salary", "Status", "Join Date"]
+SALARY_EXPORT_HEADERS = [
+    "Record ID",
+    "Worker ID",
+    "Worker Name",
+    "Month",
+    "Year",
+    "Working Days",
+    "Present Days",
+    "Deductions",
+    "Net Salary",
+    "Generated On",
+]
+ATTENDANCE_EXPORT_HEADERS = ["Worker ID", "Worker Name", "Date", "Status", "Notes"]
 EXPORT_STATUSES = {STATUS_PENDING, STATUS_APPROVED, STATUS_CHECKED_IN, STATUS_COMPLETED, STATUS_REJECTED}
 
 
@@ -972,6 +1094,159 @@ def _csv_string(headers, rows):
     return output.getvalue()
 
 
+def _excel_date_stamp():
+    return datetime.now().strftime("%d%m%Y")
+
+
+def _excel_response(workbook, filename):
+    buffer = BytesIO()
+    workbook.save(buffer)
+    buffer.seek(0)
+    return Response(
+        buffer.getvalue(),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _style_excel_sheet(sheet):
+    header_fill = PatternFill("solid", fgColor="A20405")
+    header_font = Font(color="FFFFFF", bold=True)
+    for cell in sheet[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+    sheet.freeze_panes = "A2"
+    for column_cells in sheet.columns:
+        max_length = max(len(str(cell.value or "")) for cell in column_cells)
+        sheet.column_dimensions[get_column_letter(column_cells[0].column)].width = min(max(max_length + 2, 12), 42)
+
+
+def _build_excel_workbook(sheet_name, headers, rows):
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = sheet_name
+    sheet.append(headers)
+    for row in rows:
+        sheet.append(row)
+    _style_excel_sheet(sheet)
+    return workbook
+
+
+def _add_excel_sheet(workbook, sheet_name, headers, rows):
+    sheet = workbook.create_sheet(title=sheet_name)
+    sheet.append(headers)
+    for row in rows:
+        sheet.append(row)
+    _style_excel_sheet(sheet)
+
+
+def _local_query_dict(sql, params=()):
+    conn = get_local_db()
+    try:
+        rows = conn.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def _fetch_worker_export_rows():
+    return _local_query_dict(
+        """
+        SELECT id, name, phone, monthly_salary, worker_status, created_at
+        FROM workers
+        ORDER BY id ASC
+        """
+    )
+
+
+def _fetch_salary_export_rows():
+    return _local_query_dict(
+        """
+        SELECT sr.id, sr.worker_id, COALESCE(w.name, '') AS worker_name,
+               sr.month, sr.year, sr.total_days, sr.attended_days,
+               COALESCE(sr.pocket_money_deduction, 0) + COALESCE(sr.debt_recovery_deduction, 0) AS deductions,
+               COALESCE(sr.final_payable_salary, sr.net_salary, sr.total_salary, 0) AS net_salary,
+               sr.created_at
+        FROM salary_records sr
+        LEFT JOIN workers w ON w.id = sr.worker_id
+        ORDER BY sr.year DESC, sr.month DESC, sr.id DESC
+        """
+    )
+
+
+def _fetch_attendance_export_rows(month=None, year=None):
+    filters = []
+    params = []
+    if month and year:
+        filters.append("substr(ar.date, 1, 4) = ?")
+        filters.append("substr(ar.date, 6, 2) = ?")
+        params.extend((str(int(year)), f"{int(month):02d}"))
+    where_sql = "WHERE " + " AND ".join(filters) if filters else ""
+    return _local_query_dict(
+        f"""
+        SELECT ar.worker_id, COALESCE(w.name, '') AS worker_name,
+               ar.date, ar.status, ar.notes
+        FROM attendance_records ar
+        LEFT JOIN workers w ON w.id = ar.worker_id
+        {where_sql}
+        ORDER BY ar.date DESC, ar.worker_id ASC
+        """,
+        params,
+    )
+
+
+def _worker_excel_rows(rows):
+    return [
+        [
+            _normalize_csv_value(row.get("id")),
+            _normalize_csv_value(row.get("name")),
+            _normalize_csv_value(row.get("phone")),
+            row.get("monthly_salary") or 0,
+            _normalize_csv_value(row.get("worker_status")),
+            _normalize_csv_value(row.get("created_at")),
+        ]
+        for row in rows
+    ]
+
+
+def _salary_excel_rows(rows):
+    return [
+        [
+            row.get("id"),
+            _normalize_csv_value(row.get("worker_id")),
+            _normalize_csv_value(row.get("worker_name")),
+            _normalize_csv_value(row.get("month")),
+            row.get("year"),
+            row.get("total_days") or 0,
+            row.get("attended_days") or 0,
+            row.get("deductions") or 0,
+            row.get("net_salary") or 0,
+            _normalize_csv_value(row.get("created_at")),
+        ]
+        for row in rows
+    ]
+
+
+def _attendance_excel_rows(rows):
+    status_labels = {
+        "present": "Present",
+        "absent": "Absent",
+        "half_day": "Half Day",
+        "leave": "Leave",
+        "holiday": "Holiday",
+    }
+    return [
+        [
+            _normalize_csv_value(row.get("worker_id")),
+            _normalize_csv_value(row.get("worker_name")),
+            _normalize_csv_value(row.get("date")),
+            status_labels.get(_normalize_csv_value(row.get("status")).lower(), _normalize_csv_value(row.get("status"))),
+            _normalize_csv_value(row.get("notes")),
+        ]
+        for row in rows
+    ]
+
+
 def _count_booking_exports(from_date="", to_date="", status="", garage_only=False):
     where_sql, params = _booking_filter_clause(from_date, to_date, status, garage_only)
     row = query_dict_one(f"SELECT COUNT(*) AS total FROM bookings {where_sql}", params)
@@ -982,35 +1257,37 @@ def _build_export_response(data_type, from_date="", to_date="", status=""):
     flash("Export successful!", "success")
     if data_type == "bookings":
         rows = _fetch_booking_export_rows(from_date, to_date, status)
-        return _csv_response("bookings.csv", BOOKING_EXPORT_HEADERS, _booking_csv_rows(rows))
+        workbook = _build_excel_workbook("Bookings", BOOKING_EXPORT_HEADERS, _booking_csv_rows(rows))
+        return _excel_response(workbook, f"bookings_history_{_excel_date_stamp()}.xlsx")
 
     if data_type == "customers":
         rows = _fetch_customer_export_rows()
-        return _csv_response("customers.csv", CUSTOMER_EXPORT_HEADERS, _customer_csv_rows(rows))
+        workbook = _build_excel_workbook("Customers", CUSTOMER_EXPORT_HEADERS, _customer_csv_rows(rows))
+        return _excel_response(workbook, f"customers_export_{_excel_date_stamp()}.xlsx")
 
     if data_type == "garage":
         rows = _fetch_booking_export_rows(from_date, to_date, garage_only=True)
-        return _csv_response("garage_data.csv", GARAGE_EXPORT_HEADERS, _garage_csv_rows(rows))
+        workbook = _build_excel_workbook("Garage Data", GARAGE_EXPORT_HEADERS, _garage_csv_rows(rows))
+        return _excel_response(workbook, f"garage_data_{_excel_date_stamp()}.xlsx")
 
     if data_type == "all":
         booking_rows = _fetch_booking_export_rows(from_date, to_date, status)
         customer_rows = _fetch_customer_export_rows()
-        zip_buffer = BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-            zip_file.writestr(
-                "bookings.csv",
-                _csv_string(BOOKING_EXPORT_HEADERS, _booking_csv_rows(booking_rows)),
-            )
-            zip_file.writestr(
-                "customers.csv",
-                _csv_string(CUSTOMER_EXPORT_HEADERS, _customer_csv_rows(customer_rows)),
-            )
-        zip_buffer.seek(0)
-        return Response(
-            zip_buffer.getvalue(),
-            mimetype="application/zip",
-            headers={"Content-Disposition": 'attachment; filename="admin_data_export.zip"'},
+        workbook = Workbook()
+        workbook.remove(workbook.active)
+        _add_excel_sheet(
+            workbook,
+            "Bookings",
+            BOOKING_EXPORT_HEADERS,
+            _booking_csv_rows(booking_rows),
         )
+        _add_excel_sheet(
+            workbook,
+            "Customers",
+            CUSTOMER_EXPORT_HEADERS,
+            _customer_csv_rows(customer_rows),
+        )
+        return _excel_response(workbook, f"admin_data_export_{_excel_date_stamp()}.xlsx")
 
     return None
 

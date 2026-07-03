@@ -1,6 +1,81 @@
 {% extends "admin_base.html" %}
 {% block title %}Export Data - Shreeji Auto Services{% endblock %}
 
+{% block extra_head %}
+<style>
+  .export-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .export-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    min-height: 100%;
+    padding: 1.1rem;
+    border: 1px solid rgba(26, 26, 26, 0.08);
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+  }
+
+  .export-card h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin: 0;
+    color: #1f2937;
+    font-size: 1.05rem;
+    font-weight: 800;
+  }
+
+  .export-card p {
+    margin: 0;
+    color: #6b7280;
+    font-size: 0.92rem;
+    line-height: 1.45;
+  }
+
+  .export-card .dash-btn-primary {
+    align-self: flex-start;
+    margin-top: auto;
+    background: #a20405;
+    border-color: #a20405;
+  }
+
+  .export-filters {
+    display: grid;
+    grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr);
+    gap: 0.75rem;
+  }
+
+  .export-filters label {
+    display: grid;
+    gap: 0.35rem;
+    color: #374151;
+    font-size: 0.82rem;
+    font-weight: 800;
+  }
+
+  .export-filters select,
+  .export-filters input {
+    min-height: 40px;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+  }
+
+  @media (max-width: 800px) {
+    .export-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="dashboard-wrap">
   <div class="dash-header">
@@ -8,106 +83,74 @@
       <h1 class="dash-title">
         <i class="fas fa-file-export"></i> Export Data
       </h1>
-      <p class="dash-sub">Download filtered CSV files or a combined ZIP archive.</p>
+      <p class="dash-sub">Download Excel files for bookings, customers, staff, payroll, attendance, and backups.</p>
     </div>
   </div>
 
-  <div class="dash-card">
-    <h2>Export Data</h2>
+  <div class="export-grid">
+    <article class="export-card">
+      <h3><i class="fas fa-users"></i> Customers List</h3>
+      <p>Export customer IDs, names, phone numbers, and saved vehicle details.</p>
+      <a href="{{ url_for('admin.export_download', data_type='customers') }}" class="dash-btn-primary">
+        <i class="fas fa-download"></i> Download Excel
+      </a>
+    </article>
 
-    <form method="GET" action="/admin/export/download" class="dash-form" id="exportForm">
-      <div class="dash-form-group">
-        <label>Data Type</label>
-        <select name="data_type" id="dataType" required>
-          <option value="">Select Data Type</option>
-          <option value="bookings">Booking List</option>
-          <option value="customers">Customer List</option>
-          <option value="garage">Garage Data (currently in garage)</option>
-          <option value="all">All Data (Bookings + Customers)</option>
-        </select>
-      </div>
+    <article class="export-card">
+      <h3><i class="fas fa-clipboard-list"></i> Bookings History</h3>
+      <p>Export booking IDs, customers, vehicles, services, dates, statuses, and timestamps.</p>
+      <a href="{{ url_for('admin.export_download', data_type='bookings') }}" class="dash-btn-primary">
+        <i class="fas fa-download"></i> Download Excel
+      </a>
+    </article>
 
-      <div class="dash-form-row" id="dateRangeRow">
-        <div class="dash-form-group">
-          <label>From Date</label>
-          <input type="date" name="from_date" placeholder="From Date">
+    <article class="export-card">
+      <h3><i class="fas fa-user-tie"></i> Workers List</h3>
+      <p>Export worker IDs, names, phone numbers, monthly salary, status, and join date.</p>
+      <a href="{{ url_for('admin.export_workers') }}" class="dash-btn-primary">
+        <i class="fas fa-download"></i> Download Excel
+      </a>
+    </article>
+
+    <article class="export-card">
+      <h3><i class="fas fa-clock-rotate-left"></i> Salary History</h3>
+      <p>Export payroll records with worker details, attendance days, deductions, net salary, and generated date.</p>
+      <a href="{{ url_for('admin.export_salary') }}" class="dash-btn-primary">
+        <i class="fas fa-download"></i> Download Excel
+      </a>
+    </article>
+
+    <article class="export-card">
+      <h3><i class="fas fa-calendar-days"></i> Attendance Records</h3>
+      <p>Export attendance for one month with worker name, date, status, and notes.</p>
+      <form method="GET" action="{{ url_for('admin.export_attendance_excel') }}">
+        <div class="export-filters">
+          <label>
+            Month
+            <select name="month">
+              {% for month_number in range(1, 13) %}
+                <option value="{{ month_number }}" {% if month_number == today[5:7]|int %}selected{% endif %}>{{ "%02d"|format(month_number) }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            Year
+            <input type="number" name="year" value="{{ today[:4] }}" min="2020" max="2100">
+          </label>
         </div>
-        <div class="dash-form-group">
-          <label>To Date</label>
-          <input type="date" name="to_date" placeholder="To Date">
-        </div>
-      </div>
+        <button type="submit" class="dash-btn-primary" style="margin-top:0.85rem;">
+          <i class="fas fa-download"></i> Download Excel
+        </button>
+      </form>
+    </article>
 
-      <div class="dash-form-group" id="statusFilterRow">
-        <label>Status Filter</label>
-        <select name="status">
-          <option value="">All Statuses</option>
-          <option value="pending">Pending</option>
-          <option value="approved">Approved</option>
-          <option value="checked_in">In Garage</option>
-          <option value="completed">Completed</option>
-          <option value="rejected">Rejected</option>
-        </select>
-      </div>
-
-      <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap;">
-        <button type="button" id="preview-btn" class="dash-btn-secondary">Preview Count</button>
-        <button type="submit" id="export-btn" class="dash-btn-primary" disabled>Export as CSV</button>
-      </div>
-
-      <p class="booking-modal-message" id="preview-result" hidden></p>
-    </form>
+    <article class="export-card">
+      <h3><i class="fas fa-folder-open"></i> Full Backup</h3>
+      <p>Export one Excel file with five sheets: Customers, Bookings, Workers, Salary History, and Attendance.</p>
+      <a href="{{ url_for('admin.export_full_backup') }}" class="dash-btn-primary">
+        <i class="fas fa-download"></i> Download Excel
+      </a>
+    </article>
   </div>
 </div>
-{% endblock %}
-
-{% block extra_scripts %}
-<script>
-  const exportForm = document.getElementById('exportForm');
-  const dataType = document.getElementById('dataType');
-  const dateRangeRow = document.getElementById('dateRangeRow');
-  const statusFilterRow = document.getElementById('statusFilterRow');
-  const previewButton = document.getElementById('preview-btn');
-  const exportButton = document.getElementById('export-btn');
-  const previewResult = document.getElementById('preview-result');
-
-  function updateExportControls() {
-    const selectedType = dataType.value;
-    const showDateRange = selectedType === 'bookings' || selectedType === 'garage';
-    const showStatus = selectedType === 'bookings';
-    exportButton.disabled = !selectedType;
-    dateRangeRow.style.display = showDateRange ? 'grid' : 'none';
-    statusFilterRow.style.display = showStatus ? 'flex' : 'none';
-    dateRangeRow.querySelectorAll('input').forEach(input => input.disabled = !showDateRange);
-    statusFilterRow.querySelector('select').disabled = !showStatus;
-    previewResult.hidden = true;
-  }
-
-  dataType.addEventListener('change', updateExportControls);
-
-  previewButton.addEventListener('click', async function() {
-    if (!dataType.value) {
-      previewResult.hidden = false;
-      previewResult.style.color = '#991b1b';
-      previewResult.textContent = 'Select a data type first.';
-      return;
-    }
-
-    const params = new URLSearchParams(new FormData(exportForm));
-
-    try {
-      const response = await fetch('/admin/export-preview?' + params.toString());
-      const data = await response.json();
-      previewResult.hidden = false;
-      previewResult.style.color = '#065f46';
-      previewResult.textContent = data.count + ' records will be exported';
-    } catch (error) {
-      previewResult.hidden = false;
-      previewResult.style.color = '#991b1b';
-      previewResult.textContent = 'Preview count failed. Try again.';
-    }
-  });
-
-  updateExportControls();
-</script>
 {% endblock %}

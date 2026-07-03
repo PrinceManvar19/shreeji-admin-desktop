@@ -47,7 +47,7 @@
           </a>
         {% endfor %}
       </nav>
-      <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-light mt-auto">Logout</a>
+      <a href="{{ url_for('auth.desktop_logout') }}" class="btn btn-outline-light mt-auto">Logout</a>
     </aside>
 
     <main class="admin-content">
@@ -56,7 +56,7 @@
           <div class="text-uppercase text-secondary small fw-bold">Shreeji Auto Service</div>
           <h1 class="h4 page-title mb-0">{% block page_title %}Admin{% endblock %}</h1>
         </div>
-        <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-secondary btn-sm d-lg-none">Logout</a>
+        <a href="{{ url_for('auth.desktop_logout') }}" class="btn btn-outline-secondary btn-sm d-lg-none">Logout</a>
       </div>
 
       {% with messages = get_flashed_messages(with_categories=true) %}

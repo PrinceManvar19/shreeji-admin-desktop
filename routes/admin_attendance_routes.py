@@ -21,6 +21,7 @@ from services.attendance_service import (
     get_status_badge_info,
     export_to_csv,
 )
+from services.auth_service import ensure_desktop_admin_session
 from utils.helpers import log_action
 
 
@@ -28,9 +29,9 @@ att_bp = Blueprint("attendance", __name__, url_prefix="/admin/attendance")
 
 
 def _require_admin():
-    if session.get("role") != "admin":
+    if session.get("role") != "admin" and not ensure_desktop_admin_session():
         flash("Admin access required", "error")
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("auth.desktop_login"))
     return None
 
 
