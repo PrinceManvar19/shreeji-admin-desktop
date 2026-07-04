@@ -34,6 +34,7 @@ a = Analysis(
         'dotenv',
         'sqlite3',
         'webview',
+        'bcrypt',
     ],
     hookspath=[],
     hooksconfig={},

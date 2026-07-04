@@ -206,7 +206,7 @@ def api_add_vehicle():
 def dashboard():
     if "customer_id" not in session or session.get("role") != "customer":
         flash("Please login as customer first", "error")
-        return redirect(url_for("auth.login"))
+        return redirect(url_for("public_auth.login"))
 
     customer = get_customer_by_id(session["customer_id"]) or {
         "id": session["customer_id"],

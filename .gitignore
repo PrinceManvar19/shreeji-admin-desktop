@@ -20,5 +20,3 @@ desktop.ini
 
 # PyInstaller (keep .spec in repo, ignore output)
 # ShreejiAdmin.spec <- DO NOT ignore this, it should stay in repo
-
-data/

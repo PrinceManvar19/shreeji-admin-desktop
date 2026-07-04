@@ -12,7 +12,6 @@ import webview
 APP_TITLE = "Shreeji Auto Service - Admin Panel"
 HOST = "127.0.0.1"
 HEALTH_PATH = "/health"
-START_PATH = "/admin"
 SERVER_START_TIMEOUT_SECONDS = 12
 
 
@@ -212,9 +211,9 @@ class DesktopApp:
 
     @property
     def dashboard_url(self):
-        from utils.auth_token import is_authenticated
+        from utils.token_store import is_authenticated
 
-        start_path = START_PATH if is_authenticated() else "/desktop/login"
+        start_path = "/admin" if is_authenticated() else "/admin/login"
         return f"http://{HOST}:{self.port}{start_path}"
 
     def create_window(self):

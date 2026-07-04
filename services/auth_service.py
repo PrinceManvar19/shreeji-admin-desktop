@@ -4,7 +4,7 @@ from flask import session
 
 from models.admin_model import get_admin_by_id, get_admin_by_phone
 from models.customer_model import get_customer_by_id, get_customer_by_phone_or_id
-from utils.auth_token import load_token
+from utils.token_store import load_token
 from utils.helpers import log_action, normalize_phone
 
 

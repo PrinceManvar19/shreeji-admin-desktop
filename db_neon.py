@@ -51,6 +51,16 @@ def get_neon_db():
     return g.neon_db
 
 
+def get_db_connection():
+    """Return an independent Neon connection for short authentication transactions."""
+    database_url = clean_database_url(
+        current_app.config.get("DATABASE_URL") or os.getenv("DATABASE_URL")
+    )
+    if not database_url:
+        raise ValueError("DATABASE_URL environment variable not set.")
+    return psycopg2.connect(database_url, connect_timeout=10)
+
+
 def close_neon_db(_error=None):
     connection = g.pop("neon_db", None)
 
