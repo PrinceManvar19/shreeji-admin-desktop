@@ -1,8 +1,14 @@
 # Build artifacts
 dist/
 build/
+*.exe
+*.msi
 *.zip
-installer/
+
+# Installer output (but not source scripts)
+installer/output/
+installer/*.exe
+installer/*.msi
 
 # Python
 __pycache__/
@@ -13,7 +19,7 @@ __pycache__/
 # Database (never commit client data)
 *.db
 data/
-Customer LIst/
+Customer\ Llist/
 
 # OS metadata
 desktop.ini
