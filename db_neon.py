@@ -132,6 +132,27 @@ def _create_tables(cursor, db):
     """)
 
     cursor.execute("""
+        CREATE TABLE IF NOT EXISTS admin_users (
+            email TEXT PRIMARY KEY,
+            password_hash TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS otp_tokens (
+            id SERIAL PRIMARY KEY,
+            email TEXT NOT NULL,
+            code_hash TEXT NOT NULL,
+            attempts INTEGER DEFAULT 0,
+            used BOOLEAN DEFAULT FALSE,
+            expires_at TIMESTAMP NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS bookings (
             booking_id TEXT PRIMARY KEY,
             customer_id TEXT,
@@ -324,6 +345,29 @@ def seed_admins(cursor, db):
         "Manager",
         ""
     ))
+
+    # Seed email-based admin user (secure password generation)
+    admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
+    if admin_email:
+        import secrets
+        from utils.auth_helpers import hash_password
+        
+        # Use env var if provided, otherwise generate random password
+        admin_password = os.getenv("ADMIN_DEFAULT_PASSWORD", "").strip()
+        if not admin_password:
+            admin_password = secrets.token_urlsafe(12)
+            print("\n" + "="*70, flush=True)
+            print(f"⚠️  IMPORTANT: Generated secure admin password for {admin_email}", flush=True)
+            print(f"Password: {admin_password}", flush=True)
+            print("Save this now and change it after first login — it will not be shown again.", flush=True)
+            print("="*70 + "\n", flush=True)
+        
+        admin_password_hash = hash_password(admin_password)
+        cursor.execute("""
+            INSERT INTO admin_users (email, password_hash)
+            VALUES (%s, %s)
+            ON CONFLICT (email) DO NOTHING
+        """, (admin_email, admin_password_hash))
 
     db.commit()
 
