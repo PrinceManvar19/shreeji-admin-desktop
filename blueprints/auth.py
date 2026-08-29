@@ -17,10 +17,11 @@ def login():
         password = request.form.get("password", "").strip()
 
         from db_neon import get_db_connection
+        from psycopg2.extras import RealDictCursor
 
         try:
             with get_db_connection() as conn:
-                with conn.cursor() as cur:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute(
                         "SELECT id, name, phone, password_hash FROM admins WHERE id = %s",
                         (admin_id,),
@@ -43,7 +44,6 @@ def login():
 
         save_token(admin_id)
         session.clear()
-        session["admin_logged_in"] = True
         session["admin_id"] = admin_id
         session["admin_name"] = admin_record.get("name", "Admin")
         return redirect(url_for("admin.admin"))
