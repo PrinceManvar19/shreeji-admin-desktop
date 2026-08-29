@@ -1,7 +1,7 @@
 import os
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 
 import db_neon
 from blueprints.auth import auth_bp
@@ -152,7 +152,37 @@ def create_app():
 
     @app.before_request
     def sync_session_user():
-        ensure_session_user()
+        """
+        Ensure session user is synchronized on every request.
+        Wrapped with error logging for packaged build diagnostics.
+        """
+        import traceback
+        import os
+        from pathlib import Path
+        import json
+        from datetime import datetime
+        
+        log_file = Path(os.getcwd()) / "admin_login.log"
+        try:
+            ensure_session_user()
+        except Exception as e:
+            # Log before_request errors (includes page load crashes)
+            log_entry = {
+                "timestamp": datetime.now().isoformat(),
+                "phase": "before_request",
+                "request_path": str(request.path) if request else "unknown",
+                "error": {
+                    "type": type(e).__name__,
+                    "message": str(e),
+                    "traceback": traceback.format_exc(),
+                }
+            }
+            try:
+                with open(log_file, "a") as f:
+                    f.write(json.dumps(log_entry) + "\n")
+            except Exception:
+                pass  # Ignore logging failures
+            raise  # Re-raise so error propagates and shows 500 page
 
     app.register_blueprint(main_bp)
     app.register_blueprint(public_auth_bp)
