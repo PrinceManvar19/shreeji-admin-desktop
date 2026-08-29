@@ -18,6 +18,20 @@ def login():
 
         from db_neon import get_db_connection
         from psycopg2.extras import RealDictCursor
+        import traceback
+        import os
+        from pathlib import Path
+        import json
+        from datetime import datetime
+
+        # Log all login attempts for debugging packaged builds
+        log_file = Path(os.getcwd()) / "admin_login.log"
+        log_entry = {
+            "timestamp": datetime.now().isoformat(),
+            "admin_id": admin_id,
+            "status": "unknown",
+            "error": None,
+        }
 
         try:
             with get_db_connection() as conn:
@@ -27,26 +41,58 @@ def login():
                         (admin_id,),
                     )
                     row = cur.fetchone()
-        except Exception:
+            log_entry["status"] = "query_success"
+        except Exception as e:
+            log_entry["status"] = "query_failed"
+            log_entry["error"] = {
+                "type": type(e).__name__,
+                "message": str(e),
+                "traceback": traceback.format_exc(),
+            }
+            with open(log_file, "a") as f:
+                f.write(json.dumps(log_entry) + "\n")
             flash("Database error. Check internet connection.", "danger")
             return render_template("admin/login.html")
 
         if not row:
+            log_entry["status"] = "invalid_credentials"
+            with open(log_file, "a") as f:
+                f.write(json.dumps(log_entry) + "\n")
             flash("Invalid admin ID or password.", "danger")
             return render_template("admin/login.html")
 
-        admin_record = dict(row)
-        password_hash = admin_record.get("password_hash")
+        try:
+            admin_record = dict(row)
+            password_hash = admin_record.get("password_hash")
 
-        if not password_hash or not verify_password(password, password_hash):
-            flash("Invalid admin ID or password.", "danger")
+            if not password_hash or not verify_password(password, password_hash):
+                log_entry["status"] = "invalid_password"
+                with open(log_file, "a") as f:
+                    f.write(json.dumps(log_entry) + "\n")
+                flash("Invalid admin ID or password.", "danger")
+                return render_template("admin/login.html")
+
+            save_token(admin_id)
+            session.clear()
+            session["admin_id"] = admin_id
+            session["admin_name"] = admin_record.get("name", "Admin")
+            
+            log_entry["status"] = "login_success"
+            with open(log_file, "a") as f:
+                f.write(json.dumps(log_entry) + "\n")
+            
+            return redirect(url_for("admin.admin"))
+        except Exception as e:
+            log_entry["status"] = "post_query_failed"
+            log_entry["error"] = {
+                "type": type(e).__name__,
+                "message": str(e),
+                "traceback": traceback.format_exc(),
+            }
+            with open(log_file, "a") as f:
+                f.write(json.dumps(log_entry) + "\n")
+            flash("Login error. Please try again.", "danger")
             return render_template("admin/login.html")
-
-        save_token(admin_id)
-        session.clear()
-        session["admin_id"] = admin_id
-        session["admin_name"] = admin_record.get("name", "Admin")
-        return redirect(url_for("admin.admin"))
 
     return render_template("admin/login.html")
 
