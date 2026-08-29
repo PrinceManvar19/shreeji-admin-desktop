@@ -14,10 +14,23 @@ from routes.main_routes import main_bp
 from services.auth_service import ensure_session_user
 
 
-def is_railway_environment():
+def is_hosted_environment():
+    """Detect if running on a hosted platform (Render, Railway, or similar).
+    
+    Checks for environment variables set by common hosting platforms.
+    If any are present, assumes we're in a hosted/production environment.
+    """
     return any(
         os.environ.get(name)
         for name in (
+            # Render
+            "RENDER",
+            "RENDER_GIT_BRANCH",
+            "RENDER_GIT_COMMIT",
+            "RENDER_GIT_REPO_SLUG",
+            "RENDER_INSTANCE_ID",
+            "RENDER_SERVICE_ID",
+            # Railway (legacy support)
             "RAILWAY_ENVIRONMENT",
             "RAILWAY_ENVIRONMENT_NAME",
             "RAILWAY_PROJECT_ID",
@@ -28,7 +41,7 @@ def is_railway_environment():
 
 
 def load_environment():
-    environment = "RAILWAY" if is_railway_environment() else "LOCAL"
+    environment = "HOSTED" if is_hosted_environment() else "LOCAL"
     if environment == "LOCAL":
         load_dotenv(override=False)
     return environment
@@ -59,13 +72,13 @@ def clean_database_url(database_url):
 def database_url_error(database_url):
     if not database_url:
         return (
-            "DATABASE_URL is missing. Add it to Railway Variables for the "
-            "same service that runs gunicorn."
+            "DATABASE_URL is missing. Set it in your hosting platform's "
+            "environment variables (or in .env for local development)."
         )
     if not database_url.startswith(("postgresql://", "postgres://")):
         return (
             "DATABASE_URL must start with postgresql:// or postgres://. "
-            "Do not include quotes or a DATABASE_URL= prefix in Railway."
+            "Do not include quotes or a DATABASE_URL= prefix."
         )
     return ""
 
@@ -92,8 +105,9 @@ def register_configuration_error_routes(app, message):
         return (
             "<h1>Garage Management configuration error</h1>"
             f"<p>{message}</p>"
-            "<p>Set Railway Variables -> DATABASE_URL to the raw Neon "
-            "PostgreSQL URL, then redeploy.</p>",
+            "<p>Set DATABASE_URL in your hosting platform environment variables "
+            "(e.g., Render, Railway) or in .env for local development, "
+            "then redeploy.</p>",
             503,
         )
 
@@ -109,7 +123,7 @@ def create_app():
     if not secret_key:
         raise RuntimeError(
             "SECRET_KEY environment variable is not set. "
-            "Set it in Railway environment variables or .env file before starting."
+            "Set it in your hosting platform environment variables or .env file before starting."
         )
     app.config["SECRET_KEY"] = secret_key
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"

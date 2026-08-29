@@ -34,8 +34,8 @@ def get_db():
 
         if not database_url:
             raise ValueError(
-                "DATABASE_URL environment variable not set. Add it to Railway "
-                "Variables for the web service."
+                "DATABASE_URL environment variable not set. Set it in your "
+                "hosting platform environment variables or .env for development."
             )
 
         connection = psycopg2.connect(database_url, connect_timeout=5)

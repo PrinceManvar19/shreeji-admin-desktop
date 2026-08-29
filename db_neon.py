@@ -41,8 +41,8 @@ def get_neon_db():
 
         if not database_url:
             raise ValueError(
-                "DATABASE_URL environment variable not set. Add it to Railway "
-                "Variables for the web service."
+                "DATABASE_URL environment variable not set. Set it in your "
+                "hosting platform environment variables or .env for development."
             )
 
         connection = psycopg2.connect(database_url, connect_timeout=5)
@@ -128,27 +128,6 @@ def _create_tables(cursor, db):
             name TEXT NOT NULL,
             phone TEXT,
             password_hash TEXT
-        )
-    """)
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS admin_users (
-            email TEXT PRIMARY KEY,
-            password_hash TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS otp_tokens (
-            id SERIAL PRIMARY KEY,
-            email TEXT NOT NULL,
-            code_hash TEXT NOT NULL,
-            attempts INTEGER DEFAULT 0,
-            used BOOLEAN DEFAULT FALSE,
-            expires_at TIMESTAMP NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
@@ -320,54 +299,83 @@ def start_background_init(app):
 
 
 def seed_admins(cursor, db):
-    owner_phone = os.getenv("GARAGE_OWNER_PHONE", "").strip()
-    cursor.execute("""
-        INSERT INTO admins (id, name, phone)
-        VALUES (%s, %s, %s)
-        ON CONFLICT (id) DO UPDATE SET
-            name = EXCLUDED.name,
-            phone = CASE
-                WHEN EXCLUDED.phone <> '' THEN EXCLUDED.phone
-                ELSE admins.phone
-            END
-    """, (
-        "ADMIN001",
-        "Owner",
-        owner_phone
-    ))
+    # Seed admin accounts with passwords from env vars
+    # For each admin ID (ADMIN001, ADMIN002, etc.), check for a corresponding
+    # {ADMIN_ID}_PASSWORD env var. If found, seed/update password_hash.
+    # If not found, skip seeding that admin's password and log a warning.
 
-    cursor.execute("""
-        INSERT INTO admins (id, name, phone)
-        VALUES (%s, %s, %s)
-        ON CONFLICT (id) DO NOTHING
-    """, (
-        "ADMIN002",
-        "Manager",
-        ""
-    ))
+    admin_configs = [
+        {
+            "id": "ADMIN001",
+            "name": "Owner",
+            "phone_env": "GARAGE_OWNER_PHONE",
+            "password_env": "ADMIN001_PASSWORD",
+        },
+        {
+            "id": "ADMIN002",
+            "name": "Manager",
+            "phone_env": None,
+            "password_env": "ADMIN002_PASSWORD",
+        },
+    ]
 
-    # Seed email-based admin user (secure password generation)
-    admin_email = os.getenv("ADMIN_EMAIL", "").strip().lower()
-    if admin_email:
-        import secrets
-        from utils.auth_helpers import hash_password
-        
-        # Use env var if provided, otherwise generate random password
-        admin_password = os.getenv("ADMIN_DEFAULT_PASSWORD", "").strip()
-        if not admin_password:
-            admin_password = secrets.token_urlsafe(12)
-            print("\n" + "="*70, flush=True)
-            print(f"⚠️  IMPORTANT: Generated secure admin password for {admin_email}", flush=True)
-            print(f"Password: {admin_password}", flush=True)
-            print("Save this now and change it after first login — it will not be shown again.", flush=True)
-            print("="*70 + "\n", flush=True)
-        
-        admin_password_hash = hash_password(admin_password)
-        cursor.execute("""
-            INSERT INTO admin_users (email, password_hash)
-            VALUES (%s, %s)
-            ON CONFLICT (email) DO NOTHING
-        """, (admin_email, admin_password_hash))
+    for config in admin_configs:
+        admin_id = config["id"]
+        admin_name = config["name"]
+        password_env = config["password_env"]
+        phone_env = config["phone_env"]
+
+        # Get phone from env var if specified
+        phone = ""
+        if phone_env:
+            phone = os.getenv(phone_env, "").strip()
+
+        # Check if password env var is set
+        admin_password = os.getenv(password_env, "").strip()
+        password_hash = None
+
+        if admin_password:
+            from utils.auth_helpers import hash_password
+            password_hash = hash_password(admin_password)
+        else:
+            # Log warning if password env var not set (will be caught at login time)
+            print(
+                f"⚠️  WARNING: {password_env} not set in environment. "
+                f"Admin {admin_id} will not be able to log in.",
+                flush=True,
+            )
+
+        # Upsert admin record
+        if password_hash:
+            cursor.execute(
+                """
+                INSERT INTO admins (id, name, phone, password_hash)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    phone = CASE
+                        WHEN EXCLUDED.phone <> '' THEN EXCLUDED.phone
+                        ELSE admins.phone
+                    END,
+                    password_hash = EXCLUDED.password_hash
+                """,
+                (admin_id, admin_name, phone, password_hash),
+            )
+        else:
+            # Only insert/update admin record without password if env var not set
+            cursor.execute(
+                """
+                INSERT INTO admins (id, name, phone)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    phone = CASE
+                        WHEN EXCLUDED.phone <> '' THEN EXCLUDED.phone
+                        ELSE admins.phone
+                    END
+                """,
+                (admin_id, admin_name, phone),
+            )
 
     db.commit()
 

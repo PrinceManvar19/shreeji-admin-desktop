@@ -17,7 +17,7 @@ run only on the installed desktop app.
 ## Admin Email OTP Login (Temporarily Disabled)
 
 Admin IDs such as `ADMIN001` currently log in directly. The email OTP service is kept in the codebase for later re-enable.
-Set these environment variables in `.env` locally and in Railway/production:
+Set these environment variables in `.env` locally and in your hosting platform (e.g., Render, Railway):
 
 ```text
 ADMIN_OTP_EMAIL=owner@example.com

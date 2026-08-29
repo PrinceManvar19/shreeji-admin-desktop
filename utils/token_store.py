@@ -12,7 +12,7 @@ TOKEN_LIFETIME_DAYS = 30
 def _ensure_dir():
     APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-def save_token(email: str) -> None:
+def save_token(admin_id: str) -> None:
     _ensure_dir()
     token = secrets.token_hex(32)
     token_hash = hashlib.sha256(token.encode()).hexdigest()
@@ -20,7 +20,7 @@ def save_token(email: str) -> None:
                   timedelta(days=TOKEN_LIFETIME_DAYS)).isoformat()
     TOKEN_FILE.write_text(json.dumps({
         'token_hash': token_hash,
-        'email': email,
+        'admin_id': admin_id,
         'expires_at': expires_at
     }))
 
