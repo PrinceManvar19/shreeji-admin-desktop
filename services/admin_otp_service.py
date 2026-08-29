@@ -110,7 +110,8 @@ def start_admin_otp(user):
 
     if not sent:
         log_action("ADMIN OTP DEV", f"{user['id']} OTP {otp} - {message}")
-        if os.getenv("FLASK_DEBUG", "").lower() in ("1", "true") or os.getenv("RAILWAY_ENVIRONMENT") is None:
+        # In development (local env without RENDER env vars), show OTP for testing
+        if os.getenv("FLASK_DEBUG", "").lower() in ("1", "true") or not os.getenv("RENDER"):
             message = f"OTP generated for local testing: {otp}"
 
     return True, message, mask_email(to_email)

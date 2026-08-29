@@ -41,8 +41,8 @@ def get_neon_db():
 
         if not database_url:
             raise ValueError(
-                "DATABASE_URL environment variable not set. Add it to Railway "
-                "Variables for the web service."
+                "DATABASE_URL environment variable not set. Set it in your "
+                "hosting platform environment variables or .env for development."
             )
 
         connection = psycopg2.connect(database_url, connect_timeout=5)
@@ -299,31 +299,81 @@ def start_background_init(app):
 
 
 def seed_admins(cursor, db):
-    owner_phone = os.getenv("GARAGE_OWNER_PHONE", "").strip()
-    cursor.execute("""
-        INSERT INTO admins (id, name, phone)
-        VALUES (%s, %s, %s)
-        ON CONFLICT (id) DO UPDATE SET
-            name = EXCLUDED.name,
-            phone = CASE
-                WHEN EXCLUDED.phone <> '' THEN EXCLUDED.phone
-                ELSE admins.phone
-            END
-    """, (
-        "ADMIN001",
-        "Owner",
-        owner_phone
-    ))
+    """Seed admin accounts with passwords from env vars.
+    
+    For each admin ID (ADMIN001, ADMIN002, etc.), checks for a corresponding
+    {ADMIN_ID}_PASSWORD env var. If found, seeds/updates password_hash.
+    If not found, logs a warning.
+    
+    Handles both new installs (INSERT) and existing databases where password_hash
+    was previously NULL (UPDATE WHERE password_hash IS NULL).
+    """
 
-    cursor.execute("""
-        INSERT INTO admins (id, name, phone)
-        VALUES (%s, %s, %s)
-        ON CONFLICT (id) DO NOTHING
-    """, (
-        "ADMIN002",
-        "Manager",
-        ""
-    ))
+    admin_configs = [
+        {
+            "id": "ADMIN001",
+            "name": "Owner",
+            "phone_env": "GARAGE_OWNER_PHONE",
+            "password_env": "ADMIN001_PASSWORD",
+        },
+        {
+            "id": "ADMIN002",
+            "name": "Manager",
+            "phone_env": None,
+            "password_env": "ADMIN002_PASSWORD",
+        },
+    ]
+
+    for config in admin_configs:
+        admin_id = config["id"]
+        admin_name = config["name"]
+        password_env = config["password_env"]
+        phone_env = config["phone_env"]
+
+        # Get phone from env var if specified
+        phone = ""
+        if phone_env:
+            phone = os.getenv(phone_env, "").strip()
+
+        # Check if password env var is set
+        admin_password = os.getenv(password_env, "").strip()
+        password_hash = None
+
+        if admin_password:
+            from utils.auth_helpers import hash_password
+            password_hash = hash_password(admin_password)
+        else:
+            # Log warning if password env var not set (will be caught at login time)
+            print(
+                f"⚠️  WARNING: {password_env} not set in environment. "
+                f"Admin {admin_id} will not be able to log in.",
+                flush=True,
+            )
+
+        # Insert admin record if it doesn't exist
+        cursor.execute(
+            """
+            INSERT INTO admins (id, name, phone, password_hash)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (id) DO NOTHING
+            """,
+            (admin_id, admin_name, phone, password_hash),
+        )
+
+        # If password is set, update existing rows where password_hash is NULL
+        # This handles existing databases where the column was previously unset.
+        # The UPDATE only fires once (while password_hash IS NULL) — after this,
+        # future password changes should go through the app's login/change-password flow,
+        # not this seed function.
+        if password_hash:
+            cursor.execute(
+                """
+                UPDATE admins
+                SET password_hash = %s
+                WHERE id = %s AND password_hash IS NULL
+                """,
+                (password_hash, admin_id),
+            )
 
     db.commit()
 
