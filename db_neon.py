@@ -299,10 +299,15 @@ def start_background_init(app):
 
 
 def seed_admins(cursor, db):
-    # Seed admin accounts with passwords from env vars
-    # For each admin ID (ADMIN001, ADMIN002, etc.), check for a corresponding
-    # {ADMIN_ID}_PASSWORD env var. If found, seed/update password_hash.
-    # If not found, skip seeding that admin's password and log a warning.
+    """Seed admin accounts with passwords from env vars.
+    
+    For each admin ID (ADMIN001, ADMIN002, etc.), checks for a corresponding
+    {ADMIN_ID}_PASSWORD env var. If found, seeds/updates password_hash.
+    If not found, logs a warning.
+    
+    Handles both new installs (INSERT) and existing databases where password_hash
+    was previously NULL (UPDATE WHERE password_hash IS NULL).
+    """
 
     admin_configs = [
         {
@@ -345,36 +350,29 @@ def seed_admins(cursor, db):
                 flush=True,
             )
 
-        # Upsert admin record
+        # Insert admin record if it doesn't exist
+        cursor.execute(
+            """
+            INSERT INTO admins (id, name, phone, password_hash)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (id) DO NOTHING
+            """,
+            (admin_id, admin_name, phone, password_hash),
+        )
+
+        # If password is set, update existing rows where password_hash is NULL
+        # This handles existing databases where the column was previously unset.
+        # The UPDATE only fires once (while password_hash IS NULL) — after this,
+        # future password changes should go through the app's login/change-password flow,
+        # not this seed function.
         if password_hash:
             cursor.execute(
                 """
-                INSERT INTO admins (id, name, phone, password_hash)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (id) DO UPDATE SET
-                    name = EXCLUDED.name,
-                    phone = CASE
-                        WHEN EXCLUDED.phone <> '' THEN EXCLUDED.phone
-                        ELSE admins.phone
-                    END,
-                    password_hash = EXCLUDED.password_hash
+                UPDATE admins
+                SET password_hash = %s
+                WHERE id = %s AND password_hash IS NULL
                 """,
-                (admin_id, admin_name, phone, password_hash),
-            )
-        else:
-            # Only insert/update admin record without password if env var not set
-            cursor.execute(
-                """
-                INSERT INTO admins (id, name, phone)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (id) DO UPDATE SET
-                    name = EXCLUDED.name,
-                    phone = CASE
-                        WHEN EXCLUDED.phone <> '' THEN EXCLUDED.phone
-                        ELSE admins.phone
-                    END
-                """,
-                (admin_id, admin_name, phone),
+                (password_hash, admin_id),
             )
 
     db.commit()
