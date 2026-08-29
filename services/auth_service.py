@@ -83,42 +83,32 @@ def login_user_by_id(user_id):
 # CHANGED: Login can now resolve a user from phone number or existing Customer/Admin ID.
 
 def login_user_by_identifier(identifier):
+    """
+    Customer-only login by phone number.
+    Admin login now uses dedicated /admin/login route with password verification.
+    
+    This function is for the public-facing login form and should NEVER verify
+    admins without a password. It only handles customer phone login.
+    """
     normalized_identifier = (identifier or "").strip().upper()
-
-    # Check admin first for ADMIN* IDs.
-    if normalized_identifier.startswith("ADMIN"):
-        try:
-            admin = get_admin_by_id(normalized_identifier)
-            if admin:
-                return {"id": admin["id"], "name": admin["name"], "phone": admin.get("phone", ""), "role": "admin"}
-        except Exception as error:
-            log_action("ADMIN LOGIN ERROR", str(error))
-        return None
-
-    # Check admin by registered phone before treating the value as a customer login.
     normalized_phone = normalize_phone(identifier)
+
+    # Only accept 10-digit phone numbers for customer login
+    # Admin lookup removed - admins must use /admin/login with password
     if len(normalized_phone) == 10:
         try:
-            admin = get_admin_by_phone(normalized_phone)
-            if admin:
-                return {"id": admin["id"], "name": admin["name"], "phone": admin.get("phone", ""), "role": "admin"}
+            customer = get_customer_by_phone_or_id(normalized_phone)
         except Exception as error:
-            log_action("ADMIN PHONE LOGIN ERROR", str(error))
+            log_action("CUSTOMER LOGIN ERROR", str(error))
+            return None
 
-    # Phone or customer ID.
-    try:
-        customer = get_customer_by_phone_or_id(normalized_identifier)
-    except Exception as error:
-        log_action("LOGIN ERROR", str(error))
-        return None
-
-    if customer:
-        return {
-            "id": customer["id"],
-            "name": customer["name"],
-            "phone": customer.get("phone", ""),
-            "role": "customer",
-        }
+        if customer:
+            return {
+                "id": customer["id"],
+                "name": customer["name"],
+                "phone": customer.get("phone", ""),
+                "role": "customer",
+            }
 
     return None
 
